@@ -1,8 +1,9 @@
 import { BASE_URL } from "@/apis";
-import type { UpdateProfile } from "../interfaces";
+import type { ChangePasswordRequest, UpdateProfile } from "../interfaces";
 
 // Tạo biến môi trường
 const API_URL = "users/me";
+const CHANGE_URL = '/auth/change-password'
 
 // Api thấy thông tin cá nhân
 export const getProfileApi = async () => {
@@ -23,3 +24,16 @@ export const updateProfileApi = async (data: UpdateProfile) => {
   });
   return response.data;
 };
+
+
+// api thay đổi mật khẩu
+
+export const changePassword = async (data: ChangePasswordRequest) => {
+  const response  = await BASE_URL.post(`${CHANGE_URL}`, data , {
+    headers: {
+      Authorization:`Bearer ${localStorage.getItem("accessToken")}`
+    }
+  })
+
+  return response.data
+}

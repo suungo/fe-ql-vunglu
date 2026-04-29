@@ -1,3 +1,4 @@
+import { getDeviceInfo, getOrCreateDeviceId } from "@/utils/device";
 import { Button, Form, Input, notification } from "antd";
 import { AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
@@ -13,22 +14,48 @@ export default function Login() {
   const handleLogin = async (values: LoginRequest) => {
     setIsLoading(true);
     try {
-      const response = await loginApi(values);
-      console.log(response);
-      if (response.success === true) {
-        localStorage.setItem("accessToken", response.data.accessToken);
-        localStorage.setItem("user", JSON.stringify(response.data.user));
+      // 🔥 Lấy hoặc tạo deviceId
+      const deviceId = getOrCreateDeviceId();
+      const { deviceName, deviceType } = getDeviceInfo();
+
+      // Thêm deviceId vào request
+      const loginData: LoginRequest = {
+        ...values,
+        deviceId,
+        deviceName,
+        deviceType,
+      };
+
+      const response = await loginApi(loginData);
+      if (response?.statusCode === 200) {
+        localStorage.setItem("accessToken", response?.data?.accessToken);
+        localStorage.setItem("user", JSON.stringify(response?.data?.user));
+
+        // 🔥 Lưu deviceId từ server (nếu có)
+        if (response?.data?.deviceId) {
+          localStorage.setItem("deviceId", response.data.deviceId);
+        }
+
         notification.success({
-          message: "Đăng nhập thành công",
-          description: "Bạn đã đăng nhập thành công",
+          message: "Thành công",
+          description: response?.message,
         });
         navigate("/app/dashboard");
       } else {
         notification.error({
-          message: "Đăng nhập thất bại",
-          description: response.message,
+          message: "Thất bại",
+          description: response?.message,
         });
       }
+    } catch (error: unknown) {
+      const errorMsg =
+        (error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ||
+        (error as { message?: string })?.message ||
+        "Lỗi kết nối đến máy chủ";
+      notification.error({
+        message: "Thất bại",
+        description: Array.isArray(errorMsg) ? errorMsg[0] : errorMsg,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -38,7 +65,7 @@ export default function Login() {
       <div className="w-full h-screen bg-[url('/image-auth.png')] bg-no-repeat  bg-left bg-cover relative overflow-hidden">
         <div className="z-10 flex items-center justify-center min-h-screen p-4">
           <div className="z-50 p-6 bg-white rounded-[20px] shadow-sm lg:w-[655px] md:w-[555px] w-[335px] transition-all duration-100 ease-in-out">
-            <div className="relative flex justify-center mb-2 bg-[#FAFAFA]!">
+            <div className="relative flex justify-center mb-2 bg-[#FAFAFA]! gap-1">
               <Link
                 to="/messages-realtime"
                 className="absolute right-0 top-1 inline-flex items-center gap-1.5 rounded-[8px] bg-[#e53935] px-2 py-1.5 text-[10px] font-extrabold tracking-wide text-white shadow-md transition hover:bg-[#d32f2f] focus:outline-none focus:ring-2 focus:ring-[#e53935]/40 sm:gap-2 sm:px-3 sm:py-2 sm:text-[12px]"
@@ -69,7 +96,7 @@ export default function Login() {
                 <Form.Item<LoginRequest>
                   name="phoneNumber"
                   label={
-                    <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
+                    <p className="text-[16px] text-[#464646] font-medium">
                       Số điện thoại
                       <span className="text-[#D32F2F] ml-1">*</span>
                     </p>
@@ -81,13 +108,14 @@ export default function Login() {
 
                       validator: (_, value) => {
                         return new Promise((resolve, reject) => {
-                          const phoneRegex = /^(0[3|5|7|8|9])([0-9]{8})$/;
+                          const phoneRegex =
+                            /^(0[1|3|5|7|8|9])([0-9]{8}|[0-9]{9})$/;
                           if (!value) {
                             reject(new Error("Vui lòng nhập số điện thoại"));
                           } else {
                             if (!phoneRegex.test(value)) {
                               return reject(
-                                new Error("Số điện thoại không đúng định dạng")
+                                new Error("Số điện thoại không đúng định dạng"),
                               );
                             }
                             return resolve("");
@@ -107,7 +135,7 @@ export default function Login() {
                 <Form.Item<LoginRequest>
                   name="password"
                   label={
-                    <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
+                    <p className="text-[16px] text-[#464646] font-medium">
                       Mật Khẩu<span className="text-[#D32F2F] ml-1">*</span>
                     </p>
                   }
@@ -118,7 +146,7 @@ export default function Login() {
                       validator: (_, value) => {
                         return new Promise((resolve, reject) => {
                           const passwordRegex =
-                            /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^])([A-Za-z\d@$|!%*?&#^`~<>,.])+$/;
+                            /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
                           if (!value) {
                             reject(new Error("Vui lòng nhập mật khẩu"));
                           } else {
@@ -128,8 +156,8 @@ export default function Login() {
                             ) {
                               return reject(
                                 new Error(
-                                  "Mật khẩu tối thiểu 8 ký tự bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
-                                )
+                                  "Mật khẩu tối thiểu 8 ký tự bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt",
+                                ),
                               );
                             }
                             return resolve("");
@@ -187,7 +215,7 @@ export default function Login() {
                 </Button>
               </Form.Item>
 
-              <Form.Item
+              {/* <Form.Item
                 className="text-center mb-0! flex items-center justify-center"
                 label={null}
               >
@@ -201,7 +229,7 @@ export default function Login() {
                   </Link>{" "}
                   tại đây
                 </span>
-              </Form.Item>
+              </Form.Item> */}
               <p className="text-[#000000] text-[14px] text-center">
                 Trường hợp khấn cấp vui lòng nhấp vào nút{" "}
                 <span className="text-[#D32F2F]">khấn cấp</span> ở trên để được

@@ -1,13 +1,88 @@
 import { BASE_URL } from "@/apis";
-import type { Reflection } from "../interfaces";
+import type { ApiResponse } from "@/components/interfaces/response.interface";
+import type { ReflectionStatus } from "../enum";
+import type { CreateReflection, Reflection } from "../interfaces";
 
 
 const REPORT = "reports"
+
+export interface ParamsReflection {
+  page?: number
+  limit?: number
+  keyword?: string
+  category?: string
+  priority?: string
+  status?: ReflectionStatus,
+}
 // Api thêm phản ánh
-export const addReflectionApi = async (data: Reflection) => {
-  const response = await BASE_URL.post(`/${REPORT}`, data, {
+export const createReflectionApi = async (data: CreateReflection) => {
+  const response = await BASE_URL.post<ApiResponse<CreateReflection>>(`/${REPORT}`, data, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    },
+  });
+  return response.data;
+};
+
+// API cập nhật phản ánh
+export const updateReflectionApi = async (data: Reflection) => {
+  const response = await BASE_URL.put(`/${REPORT}/${data.id}`, data, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    },
+  });
+  return response.data;
+};
+
+
+// API lấy danh sách phản ánh
+export const getReflectionsApi = async (params: ParamsReflection) => {
+  const response = await BASE_URL.get(`/${REPORT}`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    },
+    params,
+  });
+  return response.data;
+};
+
+// API lấy chi tiết phản ánh
+export const getReflectionApi = async (id: number) => {
+  const response = await BASE_URL.get(`/${REPORT}/${id}`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    },
+  });
+  return response.data;
+};
+
+// API xóa phản ánh
+export const deleteReflectionApi = async (id: number) => {
+  const response = await BASE_URL.delete(`/${REPORT}/${id}`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    },
+  });
+  return response.data;
+};
+
+export const updateReflectionStatusApi = async (id: number, status: ReflectionStatus) => {
+  const response = await BASE_URL.patch(`/${REPORT}/${id}/status`, { status }, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    },
+  });
+  return response.data;
+};
+
+// API upload file lên Cloudinary thông qua Backend
+export const uploadApi = async (file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await BASE_URL.post<{ url: string }>(`/upload/file`, formData, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+      "Content-Type": "multipart/form-data",
     },
   });
   return response.data;

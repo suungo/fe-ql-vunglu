@@ -1,17 +1,18 @@
-import { Role } from "@/enums";
+import { Gender, Role } from "@/enums";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Modal, Spin, Tooltip } from "antd";
+import dayjs from "dayjs";
 import { Edit3, KeyRound, X } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { getProfileApi } from "../api";
+import FormChangePassword from "../components/FormChangePassword";
 import FormManagerUpdateProfile from "../components/FormManagerProfile";
 import { ProfileStatus } from "../enum";
 
 export default function DetailProfile() {
-  const navigate = useNavigate();
   const [isOpenModalUpdate, setIsOpenModalUpdate] = useState(false);
-
+  const [isOpenModalChangePassword, setIsOpenModalChangePassword] =
+    useState(false);
   const {
     data: profileData,
     isLoading,
@@ -24,12 +25,61 @@ export default function DetailProfile() {
     },
   });
 
-  if (isLoading) {
-    return <Spin />;
-  }
-
+  const getRoleText = (role?: Role) => {
+    switch (role) {
+      case Role.ADMIN:
+        return "Quản trị viên";
+      case Role.MANAGER:
+        return "Quản lý phường";
+      case Role.OFFICER:
+        return "Cán bộ phường (công an)";
+      case Role.LEADER:
+        return "Tình nguyện viên";
+      case Role.STAFF:
+        return "Nhân viên y tế";
+      default:
+        return "Cư dân";
+    }
+  };
+  if (isLoading) return <Spin />;
   return (
     <>
+      {/* Modal đổi mật khẩu */}
+      <Modal
+        centered
+        maskClosable={false}
+        closeIcon={false}
+        open={isOpenModalChangePassword}
+        className="lg:w-[655px] md:w-[555px] w-[335px]"
+        onCancel={() => setIsOpenModalChangePassword(false)}
+        footer={null}
+      >
+        <div className="z-50 bg-white rounded-[20px] shadow-sm  transition-all duration-100 ease-in-out">
+          <Tooltip placement="bottomRight" title="Đóng" arrow={false}>
+            <div
+              onClick={() => setIsOpenModalChangePassword(false)}
+              className="cursor-pointer flex justify-end"
+            >
+              <X className="text-slate-700 hover:text-slate-600" size={24} />
+            </div>
+          </Tooltip>
+          <div className="flex justify-center mb-2 bg-[#FAFAFA]!">
+            <img
+              loading="lazy"
+              alt="Image Auth"
+              className="lg:w-[217px] lg:h-[139px] md:w-[143px] md:h-[90px] w-[101px] rounded-[10px] h-[70px] mix-blend-multiply"
+              src="/image-logo.png"
+            />
+          </div>
+          <h3 className="lg:text-[30px] text-[24px] mb-2 text-center font-semibold text-[#144c65]">
+            Đổi mật khẩu
+          </h3>
+          <FormChangePassword
+            onCancel={() => setIsOpenModalChangePassword(false)}
+          />
+        </div>
+      </Modal>
+
       {/* Modal cập nhật thông tin cá nhân */}
       <Modal
         centered
@@ -85,7 +135,7 @@ export default function DetailProfile() {
               <Button
                 type="default"
                 icon={<KeyRound size={16} />}
-                onClick={() => navigate("/app/profile-manager/detail")}
+                onClick={() => setIsOpenModalChangePassword(true)}
                 className="h-9! font-medium text-[16px]"
               >
                 Đổi mật khẩu
@@ -118,25 +168,27 @@ export default function DetailProfile() {
               <li className="flex items-center justify-between">
                 <span className="text-[16px] text-[#ACACAC]">Giới tính</span>
                 <span className="text-[16px] text-[#000000]">
-                  {profileData?.gender}
+                  {profileData?.gender === Gender.MALE ? "Nam" : "Nữ"}
                 </span>
               </li>
               <li className="flex items-center justify-between">
                 <span className="text-[16px] text-[#ACACAC]">Ngày sinh</span>
                 <span className="text-[16px] text-[#000000]">
-                  {profileData?.birthDate}
+                  {profileData?.dateBirth
+                    ? dayjs(profileData?.dateBirth).format("DD/MM/YYYY")
+                    : "Chưa cập nhật"}
                 </span>
               </li>
               <li className="flex items-center justify-between">
                 <span className="text-[16px] text-[#ACACAC]">Địa chỉ</span>
                 <span className="text-[16px] text-[#000000]">
-                  {profileData?.address}
+                  {profileData?.address || "Chưa cập nhật"}
                 </span>
               </li>
               <li className="flex items-center justify-between">
                 <span className="text-[16px] text-[#ACACAC]">Vai trò</span>
                 <span className="text-[16px] text-[#000000]">
-                  {profileData?.role === Role.OFFICIAL ? "Cán bộ" : "Người dân"}
+                  {getRoleText(profileData?.role?.roleCode)}
                 </span>
               </li>
               <li className="flex items-center justify-between">
@@ -156,7 +208,7 @@ export default function DetailProfile() {
               <li className="flex items-center justify-between">
                 <span className="text-[16px] text-[#ACACAC]">Ngày tạo</span>
                 <span className="text-[16px] text-[#000000]">
-                  {profileData?.createdAt}
+                  {dayjs(profileData?.createdAt).format("DD/MM/YYYY")}
                 </span>
               </li>
             </ul>

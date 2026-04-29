@@ -1,3 +1,4 @@
+import { formRules } from "@/components/constants";
 import { Gender } from "@/enums";
 import { Button, DatePicker, Form, Input, message, Select } from "antd";
 import dayjs from "dayjs";
@@ -20,7 +21,14 @@ export default function FormManagerUpdateProfile({
   const [form] = Form.useForm<UpdateProfile>();
   const [isLoading, setIsLoading] = useState(false);
   useEffect(() => {
-    form.setFieldsValue(initialValues);
+    form.setFieldsValue({
+      ...initialValues,
+      dateBirth: initialValues?.dateBirth
+        ? dayjs(initialValues.dateBirth)
+        : undefined,
+      gender: initialValues?.gender,
+      status: initialValues?.status,
+    } as unknown as UpdateProfile);
   }, [initialValues]);
 
   const handleUpdateProfile = async (values: UpdateProfile) => {
@@ -29,18 +37,20 @@ export default function FormManagerUpdateProfile({
       const DataUpdate = {
         ...values,
         userId: initialValues?.userId,
-        birthDate: dayjs(values?.birthDate).format("YYYY-MM-DD"),
+        dateBirth: dayjs(values?.dateBirth).format("YYYY-MM-DD"),
+        gender: values?.gender,
+        status: values?.status,
       };
       const response = await updateProfileApi(DataUpdate);
-      if (response?.statusCode === true) {
+      if (response?.statusCode === 200) {
         message.success("Cập nhật thông tin thành công");
         onSuccess();
         onCancel();
       } else {
         message.error(response.message);
       }
-    } catch (error) {
-      message.error("Cập nhật thông tin thất bại");
+    } catch (error: any) {
+      message.error(error.message);
     } finally {
       setIsLoading(false);
     }
@@ -55,7 +65,7 @@ export default function FormManagerUpdateProfile({
     >
       <div className="grid grid-cols-2 gap-4">
         <Form.Item<UpdateProfile>
-          rules={[{ required: true, message: "Vui lòng nhập họ và tên" }]}
+          rules={formRules.fullName()}
           name="fullName"
           label={
             <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
@@ -68,7 +78,7 @@ export default function FormManagerUpdateProfile({
           <Input className="w-full h-10!" placeholder="Nhập họ và tên" />
         </Form.Item>
         <Form.Item<UpdateProfile>
-          rules={[{ required: true, message: "Vui lòng nhập email" }]}
+          rules={formRules.email()}
           name="email"
           label={
             <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
@@ -83,7 +93,7 @@ export default function FormManagerUpdateProfile({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Form.Item<UpdateProfile>
-          rules={[{ required: true, message: "Vui lòng nhập số điện thoại" }]}
+          rules={formRules.phone()}
           name="phoneNumber"
           label={
             <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
@@ -97,7 +107,7 @@ export default function FormManagerUpdateProfile({
         </Form.Item>
         <Form.Item<UpdateProfile>
           rules={[{ required: true, message: "Vui lòng nhập ngày sinh" }]}
-          name="birthDate"
+          name="dateBirth"
           label={
             <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
               Ngày sinh
@@ -115,7 +125,7 @@ export default function FormManagerUpdateProfile({
       </div>
       <div className="">
         <Form.Item<UpdateProfile>
-          rules={[{ required: true, message: "Vui lòng nhập địa chỉ" }]}
+          rules={formRules.address()}
           name="address"
           label={
             <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
@@ -142,10 +152,17 @@ export default function FormManagerUpdateProfile({
         >
           <Select
             className="w-full h-10!"
-            options={Object.values(Gender).map((status) => ({
-              label: status === Gender.MALE ? "Nam" : "Nữ",
-              value: status,
-            }))}
+            labelInValue
+            options={[
+              {
+                label: "Nam",
+                value: Gender.MALE,
+              },
+              {
+                label: "Nữ",
+                value: Gender.FEMALE,
+              },
+            ]}
             placeholder="Nhập giới tính"
           />
         </Form.Item>
@@ -162,6 +179,7 @@ export default function FormManagerUpdateProfile({
         >
           <Select
             className="w-full h-10!"
+            labelInValue
             options={Object.values(ProfileStatus).map((status) => ({
               label:
                 status === ProfileStatus.ACTIVE

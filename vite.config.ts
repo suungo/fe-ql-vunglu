@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react-swc'
-import { defineConfig } from 'vite'
 import path from 'path'
+import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -12,5 +12,24 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  server: {
+    host: '0.0.0.0',
+    hmr: {
+      host: '192.168.100.27',
+    },
+    proxy: {
+      '/geoserver': {
+        target: 'http://192.168.100.27:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api_pcccr': {
+        target: 'https://v2.pcccr.vn',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api_pcccr/, ''),
+      },
+    },
+    
   },
 })

@@ -4,13 +4,12 @@ import type { RouteObject } from "react-router-dom";
 import GuestRoute from "./guestRoute.routes";
 
 const LoginPage = React.lazy(() => import("@/pages/auth/login/pages"));
-const RegisterPage = React.lazy(() => import("@/pages/auth/register/pages"));
 const ResetPasswordPage = React.lazy(
-  () => import("@/pages/auth/resetPassword/pages")
+  () => import("@/pages/auth/resetPassword/pages"),
 );
 const PolicyPage = React.lazy(() => import("@/pages/auth/policy"));
 const MessagesRealtimePage = React.lazy(
-  () => import("@/pages/messageRealtime/pages/MessagesRealtime")
+  () => import("@/pages/messageRealtime/pages/MessagesRealtime"),
 );
 
 export const authRoutes: RouteObject[] = [
@@ -24,16 +23,7 @@ export const authRoutes: RouteObject[] = [
       </LazyLoad>
     ),
   },
-  {
-    path: "/register",
-    element: (
-      <LazyLoad>
-        <GuestRoute>
-          <RegisterPage />
-        </GuestRoute>
-      </LazyLoad>
-    ),
-  },
+
   {
     path: "/reset",
     element: (

@@ -6,7 +6,7 @@ export interface Profile {
   phoneNumber: string; // Số điện thoại
   email: string; // Email
   gender: string; // Giới tính
-  birthDate: string; // Ngày sinh
+  dateBirth: string; // Ngày sinh
   address: string; // Địa chỉ
   addressGroup: string; // Nhóm địa chỉ
   role: string; // Vị trí
@@ -22,7 +22,13 @@ export interface UpdateProfile {
   phoneNumber: string; // Số điện thoại
   email: string; // Email
   gender: string; // Giới tính
-  birthDate: string; // Ngày sinh
+  dateBirth: string; // Ngày sinh
   address: string; // Địa chỉ
   status: ProfileStatus; // Trạng thái
+}
+
+export interface ChangePasswordRequest {
+  // phoneNumber: string; // Số điện thoại
+  oldPassword: string; // Mật khẩu cũ
+  newPassword: string; // Mật khẩu mới
 }
