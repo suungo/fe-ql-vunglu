@@ -30,11 +30,11 @@ export default function FormFloodDamages() {
   );
 
   useEffect(() => {
-    if (floodDamageDetail && id) {
+    if (floodDamageDetail?.data && id) {
       form.setFieldsValue({
-        ...floodDamageDetail,
+        ...floodDamageDetail.data,
         estimatedValue: normalizeCurrency(
-          floodDamageDetail?.estimatedValue,
+          floodDamageDetail?.data?.estimatedValue,
           "VND",
         ),
       });

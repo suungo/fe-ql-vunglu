@@ -2,40 +2,41 @@ import { Role } from "@/enums";
 import { getProfileApi } from "@/pages/profile/api";
 import { useQuery } from "@tanstack/react-query";
 import {
-    Button,
-    List,
-    Modal,
-    Popconfirm,
-    Spin,
-    Tag,
-    Tooltip,
-    message,
+  Button,
+  List,
+  Modal,
+  Popconfirm,
+  Spin,
+  Tag,
+  Tooltip,
+  message,
 } from "antd";
 import {
-    Check,
-    CheckCircle,
-    Clock,
-    Eye,
-    FileText,
-    RefreshCw,
-    Trash2,
-    User,
-    X,
-    XCircle,
+  Check,
+  CheckCircle,
+  Clock,
+  Eye,
+  FileText,
+  RefreshCw,
+  Trash2,
+  User,
+  X,
+  XCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { updateReflectionStatusApi } from "../../reflection/api";
 import { ReflectionStatus } from "../../reflection/enum";
 import {
-    deleteVerificationApi,
-    getVerificationsApi,
-    updateVerificationApi,
+  deleteVerificationApi,
+  getVerificationsApi,
+  updateVerificationApi,
 } from "../api";
 import {
-    VerificationStatus,
-    VerificationType,
-    type Verification,
+  VerificationStatus,
+  VerificationType,
+  type NotificationSocket,
+  type Verification,
 } from "../interfaces";
 
 export default function ListVerification() {
@@ -75,7 +76,7 @@ export default function ListVerification() {
     });
 
     // Refetch khi có bất kỳ thông báo nào liên quan đến verification hoặc reflection
-    socket.on("newNotification", (notification: Record<string, unknown>) => {
+    socket.on("newNotification", (notification: NotificationSocket) => {
       const relatedTypes = [
         "REFLECTION_UPDATE",
         "NEW_REFLECTION",
@@ -83,7 +84,7 @@ export default function ListVerification() {
         "VERIFICATION_UPDATE",
       ];
       if (
-        relatedTypes.includes(notification?.type) ||
+        relatedTypes.includes(notification?.type || "") ||
         notification?.referenceId ||
         notification?.title?.toLowerCase().includes("phản ánh") ||
         notification?.title?.toLowerCase().includes("xác minh")

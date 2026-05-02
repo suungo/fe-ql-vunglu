@@ -7,24 +7,17 @@ const HUMANRESOURCE_URL = '/human-resources'
 
 // API thêm nhân sự 
 export const createHumanResource = async (value: CreateHumanResources) => {
-    const response = await BASE_URL.post<ApiResponse>(`${HUMANRESOURCE_URL}`, value, {
-        headers: {
-      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-    },
-    })
-
-    return response.data
+  const response = await BASE_URL.post<ApiResponse<HumanResources>>(`${HUMANRESOURCE_URL}`, value, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  })
+  return response.data
 }
 
-// API cập nhật nhân sự 
 export const updateHumanResource = async (value: UpdateHumanResources, id: number) => {
-    const response = await BASE_URL.patch<ApiResponse>(`${HUMANRESOURCE_URL}/${id}`, value, {
-        headers: {
-      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-    },
-    })
-
-    return response.data
+  const response = await BASE_URL.patch<ApiResponse<HumanResources>>(`${HUMANRESOURCE_URL}/${id}`, value, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  })
+  return response.data
 }
 
 
@@ -54,24 +47,22 @@ export const getListHumanResource = async (
 
 // API lấy thông tin chi tiết nhân sự
 export const getDetailHumanResource = async (id: number) => {
-    const response = await BASE_URL.get<ApiResponse>(`${HUMANRESOURCE_URL}/${id}`, {
-        headers: {
+  const response = await BASE_URL.get<ApiResponse<HumanResources>>(`${HUMANRESOURCE_URL}/${id}`, {
+    headers: {
       Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
     },
-    })
-    return response.data
+  })
+  return response.data
 }
-
 
 // API xóa nhân sự
 export const deteleHumanResource = async (id: number) => {
-    const response = await BASE_URL.delete<ApiResponse>(`${HUMANRESOURCE_URL}/${id}`,
-      {
-        headers: {
-      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-    },
+  const response = await BASE_URL.delete<ApiResponse<unknown>>(`${HUMANRESOURCE_URL}/${id}`,
+    {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+      },
     }
-    )
-
-    return response.data
+  )
+  return response.data
 }

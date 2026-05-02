@@ -6,6 +6,20 @@ export interface LoginRequest {
   deviceType?: string;
 }
 
+export interface LoginResponseData {
+  accessToken: string;
+  user: {
+    id: number;
+    fullName: string;
+    phoneNumber: string;
+    role: {
+      roleCode: string;
+      roleName: string;
+    };
+  };
+  deviceId?: string;
+}
+
 export interface LoginResponse {
   token: string;
   deviceId?: string;

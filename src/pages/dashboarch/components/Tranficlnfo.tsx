@@ -1,5 +1,5 @@
 import { Card, Col, Row, Statistic, Tabs, Tag } from "antd";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { AlertTriangle, Car, Clock, MapPin } from "lucide-react";
 import React from "react";
 

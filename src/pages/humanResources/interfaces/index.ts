@@ -1,5 +1,8 @@
 import type { BaseFields } from "@/components/interfaces/base-fileds.interface";
 import type { Gender } from "@/enums";
+import type dayjs from "dayjs";
+
+type DayjsType = ReturnType<typeof dayjs>;
 
 export interface HumanResources extends BaseFields{
   employeeCode: string; // Mã nhân sự
@@ -19,7 +22,7 @@ export interface CreateHumanResources {
   fullName: string; // Tên nhân sự
   email: string; // Email
   phoneNumber: string; // Số điện thoại
-  dateBirth: string, // Ngày sinh
+  dateBirth: string | DayjsType | null; // Ngày sinh
   address: string; // Địa chỉ
   position: string; // Chức vụ
   gender: Gender; // Giới tính

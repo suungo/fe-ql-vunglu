@@ -1,3 +1,4 @@
+import type { IFloodDamage } from "@/pages/floodDamages/interfaces";
 import type { HasBusiness, HasChildren, HasElderly, HasPregnant, HasSick, HouseType } from "../enum";
 
 export interface Resident {

@@ -28,7 +28,7 @@ export default function Login() {
 
       const response = await loginApi(loginData);
       if (response?.statusCode === 200) {
-        localStorage.setItem("accessToken", response?.data?.accessToken);
+        localStorage.setItem("accessToken", response?.data?.accessToken || "");
         localStorage.setItem("user", JSON.stringify(response?.data?.user));
 
         // 🔥 Lưu deviceId từ server (nếu có)
@@ -49,7 +49,12 @@ export default function Login() {
       }
     } catch (error: unknown) {
       const errorMsg =
-        (error as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ||
+        (
+          error as {
+            response?: { data?: { message?: string } };
+            message?: string;
+          }
+        )?.response?.data?.message ||
         (error as { message?: string })?.message ||
         "Lỗi kết nối đến máy chủ";
       notification.error({

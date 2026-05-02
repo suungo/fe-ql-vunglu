@@ -1,10 +1,10 @@
 import { BASE_URL } from "@/apis";
 import type { ApiResponse } from "@/components/interfaces/response.interface";
 import type {
-  FloodDamage,
-  FloodDamageFilter,
-  FloodDamageStats,
-  UpdateFloodDamageRequest
+    FloodDamage,
+    FloodDamageFilter,
+    FloodDamageStats,
+    UpdateFloodDamageRequest
 } from "@/types/flood-damage.types";
 
 const FLOOD_DAMAGE_URL = "/flood-damages";
@@ -28,7 +28,7 @@ export const updateFloodDamage = async (
 
 // 🗑️ Xóa thiệt hại
 export const deleteFloodDamage = async (id: number) => {
-  const response = await BASE_URL.delete<ApiResponse>(
+  const response = await BASE_URL.delete<ApiResponse<void>>(
     `${FLOOD_DAMAGE_URL}/${id}`,
     {
       headers: {

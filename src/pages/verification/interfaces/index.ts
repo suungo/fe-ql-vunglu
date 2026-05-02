@@ -39,3 +39,10 @@ export interface UpdateVerification {
   status: VerificationStatus;
   reviewNote?: string;
 }
+
+export interface NotificationSocket {
+  type?: string;
+  title?: string;
+  referenceId?: number;
+  [key: string]: unknown;
+}
