@@ -1,13 +1,4 @@
-import {
-  Button,
-  Card,
-  Descriptions,
-  Empty,
-  Spin,
-  Table,
-  Tag,
-  Typography,
-} from "antd";
+import { Button, Card, Descriptions, Empty, Spin, Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -29,9 +20,8 @@ import iconRetina from "leaflet/dist/images/marker-icon-2x.png";
 import iconMarker from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
 import { HouseTypeLabel } from "../constants";
+import type { HouseType } from "../enum";
 import { useResidentById } from "../hooks";
-
-const { Text } = Typography;
 
 const categoryConfig: Record<DamageCategory, { label: string; color: string }> =
   {
@@ -190,7 +180,7 @@ export default function DetailResidents() {
               {resident?.address || "---"}
             </Descriptions.Item>
             <Descriptions.Item label="Loại nhà ở">
-              {HouseTypeLabel[resident?.houseType] || "---"}
+              {HouseTypeLabel[resident?.houseType as HouseType] || "---"}
             </Descriptions.Item>
             <Descriptions.Item label="Số tầng">
               {resident?.numberOfFloors || "0"}

@@ -1,14 +1,7 @@
 import { Modal, Tag, Typography } from "antd";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import {
-  Car,
-  Check,
-  Clock,
-  CloudRain,
-  Info,
-  Waves,
-} from "lucide-react";
+import { Car, Check, Clock, CloudRain, Info, Waves } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import {
   CircleMarker,
@@ -22,17 +15,6 @@ import {
 
 const { Title } = Typography;
 
-interface FloodPoint {
-  id: number;
-  position: [number, number];
-  level: "low" | "medium" | "high";
-  locationName: string;
-  description: string;
-  depth: number;
-  updatedAt: string;
-}
-
-
 const defaultIcon = new L.Icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
@@ -43,17 +25,21 @@ L.Marker.prototype.options.icon = defaultIcon;
 
 const mapCenter: [number, number] = [10.865, 106.731];
 
-const GEOSERVER_URL = "/geoserver/tambinh/wms";
+const GEOSERVER_URL = `${import.meta.env.VITE_API_URL_GEOSERVER}/geoserver/tambinh/wms`;
 const GEOSERVER_LAYER = "tambinh:tam-binh_map";
+const GEOSERVER_QUERY_LAYER = "tambinh:ranhphuongTamBinh";
 
 // ========== WMS GetFeatureInfo khi click ==========
 
 /** Parse GeoServer text/plain response:
  *  "key = value\n" → { key: value }
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parseGeoServerText(text: string): Record<string, any> {
-  const result: Record<string, string> = {};
+interface GeoServerProperties {
+  [key: string]: string;
+}
+
+function parseGeoServerText(text: string): GeoServerProperties {
+  const result: GeoServerProperties = {};
   text.split("\n").forEach((line) => {
     const sep = line.indexOf("=");
     if (sep > 0) {
@@ -77,8 +63,7 @@ function WmsClickHandler({
   const popupRef = useRef<ReturnType<typeof L.popup> | null>(null);
 
   const map = useMapEvents({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    click: async (e: any) => {
+    click: async (e: { latlng: { lat: number; lng: number } }) => {
       const size = map.getSize();
       const bounds = map.getBounds();
       const point = map.latLngToContainerPoint(e.latlng);
@@ -119,16 +104,16 @@ function WmsClickHandler({
       try {
         const res = await fetch(`${wmsUrl}?${params.toString()}`);
         const jsonData = await res.json();
-        
+
         if (popupRef.current) popupRef.current.remove();
 
         if (jsonData?.features?.length > 0) {
           const props = jsonData.features[0].properties;
           const tenDvhc =
-            props?.ten_dvhc ?? 
-            props?.TEN_DVHC ?? 
-            props?.Ten_DVHC ?? 
-            props?.name ?? 
+            props?.ten_dvhc ??
+            props?.TEN_DVHC ??
+            props?.Ten_DVHC ??
+            props?.name ??
             "Không rõ";
 
           const popup = L.popup({ maxWidth: 300 })
@@ -152,11 +137,12 @@ function WmsClickHandler({
           const resText = await fetch(`${wmsUrl}?${params.toString()}`);
           const buffer = await resText.arrayBuffer();
           const text = new TextDecoder("utf-8").decode(buffer);
-          
+
           if (text.includes("ten_dvhc") || text.includes("TEN_DVHC")) {
             const props = parseGeoServerText(text);
-            const tenDvhc = props["ten_dvhc"] || props["TEN_DVHC"] || "Không rõ";
-             const popup = L.popup({ maxWidth: 300 })
+            const tenDvhc =
+              props["ten_dvhc"] || props["TEN_DVHC"] || "Không rõ";
+            const popup = L.popup({ maxWidth: 300 })
               .setLatLng(e.latlng)
               .setContent(
                 `<div style="font-family:'Inter', sans-serif;padding:4px 2px;">
@@ -176,11 +162,10 @@ function WmsClickHandler({
             popupRef.current = popup;
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("[GeoServer] Lỗi:", err);
         if (popupRef.current) popupRef.current.remove();
       }
-      
     },
   });
 
@@ -210,7 +195,9 @@ const getPriorityColor = (priority: string) => {
 };
 
 export default function Dashboard() {
-  const [resolvedReflections, setResolvedReflections] = useState<Reflection[]>([]);
+  const [resolvedReflections, setResolvedReflections] = useState<Reflection[]>(
+    [],
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentInfo, setCurrentInfo] = useState<{
     title: string;
@@ -276,13 +263,16 @@ export default function Dashboard() {
         </Title>
         <div className="flex gap-3 text-[10px] md:text-sm bg-white/50 p-2 rounded-lg border border-white">
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500 block" /> Ưu tiên thấp
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500 block" /> Ưu
+            tiên thấp
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 block" /> Trung bình
+            <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 block" />{" "}
+            Trung bình
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 block" /> Khẩn cấp
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 block" /> Khẩn
+            cấp
           </div>
         </div>
       </div>
@@ -291,7 +281,8 @@ export default function Dashboard() {
       <div className="text-xs text-slate-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 flex items-center gap-2">
         <span>📍</span>
         <span>
-          Bản đồ hiển thị <strong>Các sự kiện đang xử lý và đã hoàn tất</strong>. Màu sắc thể hiện mức độ ưu tiên của sự cố.
+          Bản đồ hiển thị <strong>Các sự kiện đang xử lý và đã hoàn tất</strong>
+          . Màu sắc thể hiện mức độ ưu tiên của sự cố.
         </span>
       </div>
 
@@ -345,56 +336,92 @@ export default function Dashboard() {
             </LayersControl.Overlay>
           </LayersControl>
 
+          {/* WMS Click Handler — lấy thông tin đơn vị hành chính khi click */}
+          <WmsClickHandler
+            wmsUrl={GEOSERVER_URL}
+            displayLayer={GEOSERVER_LAYER}
+            queryLayer={GEOSERVER_QUERY_LAYER}
+          />
+
           {/* Markers */}
-          {resolvedReflections.map((r) => (
-            r.lat && r.lng && (
-              <CircleMarker
-                key={r.id}
-                center={[r.lat, r.lng]}
-                pathOptions={{
-                  color: r.status === ReflectionStatus.RESOLVED ? "#22c55e" : "#3b82f6",
-                  weight: 3,
-                  fillColor: getPriorityColor(r.priority), 
-                  fillOpacity: 0.8,
-                }}
-                radius={12}
-              >
-                <Popup>
-                  <div className="p-1 min-w-[250px]">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`h-8 w-8 ${r.status === ReflectionStatus.RESOLVED ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'} rounded-full flex items-center justify-center`}>
-                          {r.status === ReflectionStatus.RESOLVED ? <Check size={18} /> : <Clock size={18} />}
+          {resolvedReflections.map(            (r) =>
+              r.lat &&
+              r.lng && (
+                <CircleMarker
+                  key={r.id}
+                  center={[r.lat, r.lng]}
+                  pathOptions={{
+                    color:
+                      r.status === ReflectionStatus.RESOLVED
+                        ? "#22c55e"
+                        : "#3b82f6",
+                    weight: 3,
+                    fillColor: getPriorityColor(r.priority),
+                    fillOpacity: 0.8,
+                  }}
+                  radius={12}
+                >
+                  <Popup>
+                    <div className="p-1 min-w-[250px]">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`h-8 w-8 ${r.status === ReflectionStatus.RESOLVED ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"} rounded-full flex items-center justify-center`}
+                          >
+                            {r.status === ReflectionStatus.RESOLVED ? (
+                              <Check size={18} />
+                            ) : (
+                              <Clock size={18} />
+                            )}
+                          </div>
+                          <h3 className="font-bold text-base m-0 text-slate-800">
+                            {r.status === ReflectionStatus.RESOLVED
+                              ? "Sự cố đã khắc phục"
+                              : "Sự cố đang xử lý"}
+                          </h3>
                         </div>
-                        <h3 className="font-bold text-base m-0 text-slate-800">
-                          {r.status === ReflectionStatus.RESOLVED ? "Sự cố đã khắc phục" : "Sự cố đang xử lý"}
-                        </h3>
+                        <Tag
+                          color={
+                            r.status === ReflectionStatus.RESOLVED
+                              ? "green"
+                              : "blue"
+                          }
+                        >
+                          {r.status === ReflectionStatus.RESOLVED
+                            ? "Xong"
+                            : "Đang xử lý"}
+                        </Tag>
                       </div>
-                      <Tag color={r.status === ReflectionStatus.RESOLVED ? "green" : "blue"}>
-                         {r.status === ReflectionStatus.RESOLVED ? "Xong" : "Đang xử lý"}
-                      </Tag>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-sm">
-                        <p className="font-bold text-slate-700 mb-1">{r.title}</p>
-                        <p className="text-slate-600 italic">"{r.content}"</p>
-                      </div>
-                      {r.status === ReflectionStatus.RESOLVED && (
-                        <div className="bg-green-50 p-2 rounded-lg border border-green-100 text-sm">
-                          <p className="font-medium text-green-700 mb-1">Kết quả xử lý:</p>
-                          <p className="text-green-800">{r.response || "Đã hoàn thành công tác xử lý tại thực địa."}</p>
+                      <div className="space-y-2">
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-sm">
+                          <p className="font-bold text-slate-700 mb-1">
+                            {r.title}
+                          </p>
+                          <p className="text-slate-600 italic">"{r.content}"</p>
                         </div>
-                      )}
-                      <div className="flex flex-col gap-1 pt-1 text-xs text-slate-400">
-                        <span>📍 {r.address || `${r.lat}, ${r.lng}`}</span>
-                        <span>⏰ {new Date(r.createdAt).toLocaleString("vi-VN")}</span>
+                        {r.status === ReflectionStatus.RESOLVED && (
+                          <div className="bg-green-50 p-2 rounded-lg border border-green-100 text-sm">
+                            <p className="font-medium text-green-700 mb-1">
+                              Kết quả xử lý:
+                            </p>
+                            <p className="text-green-800">
+                              {r.response ||
+                                "Đã hoàn thành công tác xử lý tại thực địa."}
+                            </p>
+                          </div>
+                        )}
+                        <div className="flex flex-col gap-1 pt-1 text-xs text-slate-400">
+                          <span>📍 {r.address || `${r.lat}, ${r.lng}`}</span>
+                          <span>
+                            ⏰ {new Date(r.createdAt).toLocaleString("vi-VN")}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Popup>
-              </CircleMarker>
-            )
-          ))}
+                  </Popup>
+                </CircleMarker>
+              ),
+          )}
         </MapContainer>
       </div>
 

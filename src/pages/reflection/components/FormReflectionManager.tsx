@@ -8,6 +8,7 @@ import {
   Upload,
   message,
   notification,
+  type UploadFile,
 } from "antd";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -66,7 +67,7 @@ export default function CreateReportPage({ mode }: Props) {
     lng: number;
     address?: string;
   } | null>(null);
-  const [fileList, setFileList] = useState<any[]>([]);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [trustScore, setTrustScore] = useState(0);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -250,7 +251,7 @@ export default function CreateReportPage({ mode }: Props) {
 
   function LocationMarker() {
     useMapEvents({
-      click(e: any) {
+      click(e: { latlng: { lat: number; lng: number } }) {
         handleLocationSelect(e.latlng);
       },
     });
@@ -271,7 +272,7 @@ export default function CreateReportPage({ mode }: Props) {
 
     setLoading(true);
     try {
-      const payload: any = {
+      const payload = {
         ...values,
         content: values.content || values.description || "",
         category: values.category || Category.OTHER,
@@ -309,15 +310,16 @@ export default function CreateReportPage({ mode }: Props) {
       if (response.statusCode === 200) {
         notification.success({
           message: "Thành công",
+
           description: response?.message,
         });
         navigate("/app/reflection-manager/list");
       }
-    } catch (error: any) {
-      const err = error?.response?.data as any;
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
       notification.error({
         message: "Thất bại",
-        description: err?.message,
+        description: err?.response?.data?.message,
       });
     } finally {
       setLoading(false);

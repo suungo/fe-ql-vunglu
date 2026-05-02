@@ -94,7 +94,7 @@ export default function ListFloodDamages() {
   console.log(damages);
 
   const filteredDamages =
-    damages?.data.filter((d: any) => {
+    damages?.data.filter((d: IFloodDamage) => {
       if (filters.category && d.damageCategory !== filters.category)
         return false;
       if (
@@ -297,11 +297,20 @@ export default function ListFloodDamages() {
   }, [navigate]);
 
   const totalValue =
-    damages?.data.reduce((sum: any, d: any) => sum + d.estimatedValue, 0) || 0;
+    damages?.data.reduce(
+      (sum: number, d: IFloodDamage) => sum + d.estimatedValue,
+      0,
+    ) || 0;
   const totalInjured =
-    damages?.data.reduce((sum: any, d: any) => sum + d.injuredCount, 0) || 0;
+    damages?.data.reduce(
+      (sum: number, d: IFloodDamage) => sum + d.injuredCount,
+      0,
+    ) || 0;
   const totalDeaths =
-    damages?.data.reduce((sum: any, d: any) => sum + d.deathCount, 0) || 0;
+    damages?.data.reduce(
+      (sum: number, d: IFloodDamage) => sum + d.deathCount,
+      0,
+    ) || 0;
 
   return (
     <div className="p-4 mx-auto space-y-4 bg-white rounded-xl shadow">

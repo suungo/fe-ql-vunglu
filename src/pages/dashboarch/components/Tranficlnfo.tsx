@@ -43,12 +43,12 @@ const floodedRoutes = [
   },
 ];
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: "easeOut" },
+    transition: { duration: 0.5, ease: "easeOut" as const },
   },
 };
 
@@ -149,7 +149,7 @@ const TrafficInfo: React.FC = () => {
 
   return (
     <motion.div
-      variants={containerVariants as any}
+      variants={containerVariants}
       initial="hidden"
       animate="visible"
       className="py-2"

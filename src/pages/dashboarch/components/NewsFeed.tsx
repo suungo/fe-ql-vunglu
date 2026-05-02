@@ -15,8 +15,8 @@ import {
 import { motion } from "framer-motion";
 import React, { useEffect, useRef, useState } from "react";
 import { ReflectionStatus } from "../../reflection/enum";
+import type { Reflection } from "../../reflection/interfaces";
 
-import type { Reflection } from "@/pages/reflection/interfaces";
 import {
   Award,
   Calendar,
@@ -43,16 +43,18 @@ interface Comment {
   isLiked: boolean;
 }
 
+interface User {
+  name: string;
+  avatar: string;
+  role?: {
+    roleName: string;
+    roleCode: string;
+  };
+}
+
 interface NewsItem {
   id: number;
-  user: {
-    name: string;
-    avatar: string;
-    role?: {
-      roleName: string;
-      roleCode: string;
-    };
-  };
+  user: User;
   content: string;
   image?: string;
   location: string;
@@ -74,7 +76,7 @@ const UserProfileModal = ({
   open,
   onClose,
 }: {
-  user: any;
+  user: User | null;
   open: boolean;
   onClose: () => void;
 }) => {
@@ -209,13 +211,13 @@ const NewsFeedItem = ({
   onUserClick,
 }: {
   item: NewsItem;
-  onUserClick: (user: any) => void;
+  onUserClick: (user: User) => void;
 }) => {
-  const [liked, setLiked] = useState(item.isLiked);
-  const [likesCount, setLikesCount] = useState(item.likes);
-  const [showComments, setShowComments] = useState(false);
+  const [liked, setLiked] = useState<boolean>(item.isLiked);
+  const [likesCount, setLikesCount] = useState<number>(item.likes);
+  const [showComments, setShowComments] = useState<boolean>(false);
   const [comments, setComments] = useState<Comment[]>(item.comments);
-  const [commentInput, setCommentInput] = useState("");
+  const [commentInput, setCommentInput] = useState<string>("");
   const inputRef = useRef<InputRef>(null);
 
   const handleLike = () => {
@@ -467,7 +469,7 @@ const NewsFeedItem = ({
 };
 
 const NewsFeed: React.FC = () => {
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [reflections, setReflections] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -476,29 +478,31 @@ const NewsFeed: React.FC = () => {
       try {
         const token = localStorage.getItem("accessToken");
         // Sử dụng isMap=true để lấy toàn bộ danh sách phản ánh công khai (đang xử lý/đã xử lý)
-        const res = await fetch(`http://localhost:3001/api/reports?isMap=true&limit=20`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(
+          `http://localhost:3001/api/reports?isMap=true&limit=20`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
         const json = await res.json();
 
         if (json.statusCode === 200 && Array.isArray(json.data)) {
-          const approvedReflections = json.data.map((r: any) => ({
+          const approvedReflections = json.data.map((r: Reflection) => ({
             id: r.id,
             user: {
               name: r.user?.fullName || "Người dùng ẩn danh",
-              avatar:
-                "https://api.dicebear.com/7.x/avataaars/svg?seed=" +
-                (r.user?.id || r.id),
-              role: r.user?.role || { roleName: "Cư dân", roleCode: "RESIDENT" },
+              avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=" + r.id,
+              role: r.user?.role || {
+                roleName: "Cư dân",
+                roleCode: "RESIDENT",
+              },
             },
             content: r.content,
             image:
               r.imageUrl && r.imageUrl.length > 0 ? r.imageUrl[0] : undefined,
             location: r.address || "Vị trí chưa xác định",
             status:
-              r.status === ReflectionStatus.RESOLVED
-                ? "resolved"
-                : "approved",
+              r.status === ReflectionStatus.RESOLVED ? "resolved" : "approved",
             timestamp: new Date(r.createdAt).toLocaleString("vi-VN", {
               day: "2-digit",
               month: "2-digit",
@@ -521,7 +525,7 @@ const NewsFeed: React.FC = () => {
     fetchReflections();
   }, []);
 
-  const handleUserClick = (user: any) => {
+  const handleUserClick = (user: User) => {
     setSelectedUser(user);
   };
 

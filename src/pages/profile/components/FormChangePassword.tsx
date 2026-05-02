@@ -34,10 +34,13 @@ export default function FormChangePassword({ onCancel }: PropType) {
         });
         onCancel();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as {
+        response?: { data?: { message?: string; error?: string } };
+      };
       const messageError =
-        error.response.data?.message ||
-        error.response.data?.error ||
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
         "Lỗi từ server";
 
       notification.error({

@@ -97,7 +97,7 @@ export default function DetailFloodDamages() {
   useEffect(() => {
     // TODO: Load damage from API
     setDamage(mockDamage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [id]);
 
   const handleDelete = async () => {

@@ -262,7 +262,7 @@ const containerVariants = {
   visible: {
     opacity: 1,
     x: 0,
-    transition: { duration: 0.3, ease: "easeOut" },
+    transition: { duration: 0.3, ease: "easeOut" as const },
   },
   exit: { opacity: 0, x: 20 },
 };
@@ -400,7 +400,7 @@ const OtherInfo: React.FC = () => {
         {!activeCategory ? (
           <motion.div
             key="menu"
-            variants={containerVariants as any}
+            variants={containerVariants}
             initial="hidden"
             animate="visible"
             exit="exit"
@@ -434,7 +434,7 @@ const OtherInfo: React.FC = () => {
         ) : (
           <motion.div
             key="detail"
-            variants={containerVariants as any}
+            variants={containerVariants}
             initial="hidden"
             animate="visible"
             exit="exit"

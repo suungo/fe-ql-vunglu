@@ -1,10 +1,10 @@
 import {
-  Activity,
-  AlertTriangle,
-  CloudRain,
-  Droplets,
-  Radio,
-  Waves,
+    Activity,
+    AlertTriangle,
+    CloudRain,
+    Droplets,
+    Radio,
+    Waves,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -38,7 +38,7 @@ export default function Overview() {
     }, stepMs);
 
     return () => clearInterval(timer);
-  }, [countdownSeconds, navigate]);
+  }, [navigate]);
 
   const skip = () => navigate("/app/dashboard", { replace: true });
 

@@ -54,7 +54,7 @@ const containerVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: "easeOut" },
+    transition: { duration: 0.5, ease: "easeOut" as const },
   },
 };
 
@@ -200,7 +200,7 @@ const RainInfo: React.FC = () => {
 
   return (
     <motion.div
-      variants={containerVariants as any}
+      variants={containerVariants}
       initial="hidden"
       animate="visible"
       className="py-2"

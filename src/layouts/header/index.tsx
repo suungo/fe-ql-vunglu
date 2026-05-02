@@ -25,6 +25,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
 
+interface Notification {
+  id: string;
+  title: string;
+  content: string;
+  type: string;
+  isRead: boolean;
+  createdAt: string;
+  reflectionId?: string;
+  damageId?: string;
+  referenceId?: string;
+}
+
 const BellIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -51,9 +63,10 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   const [now, setNow] = useState(() => new Date());
   // const [isConnected, setIsConnected] = useState(false);
   const [alertsCount, setAlertsCount] = useState<number | null>(null);
-  const [notifications, setNotifications] = useState<Record<string, unknown>[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpenModalLogout, setIsOpenModalLogout] = useState(false);
-  const [selectedNotification, setSelectedNotification] = useState<Record<string, unknown> | null>(null);
+  const [selectedNotification, setSelectedNotification] =
+    useState<Notification | null>(null);
   const [isOpenModalChangePassword, setIsOpenModalChangePassword] =
     useState(false);
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -110,7 +123,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     VERIFICATION_REJECTED: "Yêu cầu xác minh đã bị từ chối",
     VERIFICATION_COMPLETED: "Yêu cầu xác minh đã hoàn thành",
   };
-  const handleNotificationClick = async (item: Record<string, unknown>) => {
+  const handleNotificationClick = async (item: Notification) => {
     // 1. Mark as read
     try {
       const token = localStorage.getItem("accessToken");
@@ -144,7 +157,10 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     }
   };
 
-  const showNotificationDetail = async (item: Record<string, unknown>, e: React.MouseEvent) => {
+  const showNotificationDetail = async (
+    item: Notification,
+    e: React.MouseEvent,
+  ) => {
     e.stopPropagation(); // Ngăn chặn sự kiện click vào item (điều hướng)
     setSelectedNotification(item);
 
@@ -223,13 +239,16 @@ export default function Header({ onMenuToggle }: HeaderProps) {
                     {item?.content}
                   </span>
                   <span className="text-[10px] text-gray-400 font-medium">
-                    {new Date(item.createdAt).toLocaleString("vi-VN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })}
+                    {new Date(item.createdAt as string).toLocaleString(
+                      "vi-VN",
+                      {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                      },
+                    )}
                   </span>
                 </div>
               }
@@ -241,7 +260,10 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   );
 
   useEffect(() => {
-    fetchUnreadCount();
+    // Wrap in queueMicrotask to avoid synchronous setState in effect body
+    queueMicrotask(() => {
+      fetchUnreadCount();
+    });
 
     // Thiết lập kết nối Socket.io cho thông báo
     const token = localStorage.getItem("accessToken");
@@ -258,7 +280,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         console.log("Connected to notification socket");
       });
 
-      socket.on("newNotification", (notification: Record<string, unknown>) => {
+      socket.on("newNotification", (notification: Notification) => {
         setNotifications((prev) => [notification, ...prev]);
         setAlertsCount((prev) => (prev || 0) + 1);
 
@@ -266,8 +288,8 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         message.info({
           content: (
             <div onClick={() => setSelectedNotification(notification)}>
-              <p className="font-bold mb-0">{notification.title as string}</p>
-              <p className="text-xs">{notification.content as string}</p>
+              <p className="font-bold mb-0">{notification.title}</p>
+              <p className="text-xs">{notification.content}</p>
             </div>
           ),
           icon: <BellIcon />,
@@ -434,26 +456,28 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         }
         open={!!selectedNotification}
         onCancel={() => setSelectedNotification(null)}
-        footer={[
-          <Button
-            key="close"
-            type="primary"
-            onClick={() => setSelectedNotification(null)}
-          >
-            Đóng
-          </Button>,
-          selectedNotification?.referenceId && (
+        footer={
+          <div className="flex justify-end gap-2">
             <Button
-              key="go"
-              onClick={() => {
-                handleNotificationClick(selectedNotification);
-                setSelectedNotification(null);
-              }}
+              key="close"
+              type="primary"
+              onClick={() => setSelectedNotification(null)}
             >
-              Đi đến trang liên quan
+              Đóng
             </Button>
-          ),
-        ]}
+            {selectedNotification?.referenceId && (
+              <Button
+                key="go"
+                onClick={() => {
+                  handleNotificationClick(selectedNotification);
+                  setSelectedNotification(null);
+                }}
+              >
+                Đi đến trang liên quan
+              </Button>
+            )}
+          </div>
+        }
         width={500}
       >
         {selectedNotification && (
@@ -480,7 +504,12 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               <div className="flex items-center gap-1">
                 <Info size={14} />
                 <span>
-                  Loại: {notificationTypeMap[selectedNotification.type]}
+                  Loại:{" "}
+                  {
+                    notificationTypeMap[
+                      selectedNotification.type as keyof typeof notificationTypeMap
+                    ]
+                  }
                 </span>
               </div>
               <span>

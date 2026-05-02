@@ -1,7 +1,7 @@
 import { BASE_URL } from "@/apis";
 import type { ApiResponse } from "@/components/interfaces/response.interface";
 import type { ReflectionStatus } from "../enum";
-import type { CreateReflection, Reflection } from "../interfaces";
+import type { CreateReflection, UpdateReflection } from "../interfaces";
 
 
 const REPORT = "reports"
@@ -25,7 +25,7 @@ export const createReflectionApi = async (data: CreateReflection) => {
 };
 
 // API cập nhật phản ánh
-export const updateReflectionApi = async (data: Reflection) => {
+export const updateReflectionApi = async (data: UpdateReflection) => {
   const response = await BASE_URL.put(`/${REPORT}/${data.id}`, data, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem("accessToken")}`,

@@ -1,40 +1,40 @@
 import useDebounce from "@/hooks/useDebounce";
 import useStyle from "@/interfaces/useStyle";
 import {
-    Button,
-    Drawer,
-    Dropdown,
-    Empty,
-    Input,
-    Modal,
-    notification,
-    Select,
-    Spin,
-    Table,
-    Tooltip,
+  Button,
+  Drawer,
+  Dropdown,
+  Empty,
+  Input,
+  Modal,
+  notification,
+  Select,
+  Spin,
+  Table,
+  Tooltip,
 } from "antd";
 import type { ColumnType } from "antd/es/table";
 import { AxiosError } from "axios";
 import {
-    EllipsisVertical,
-    Eye,
-    Filter,
-    Pencil,
-    RefreshCw,
-    Search,
-    Trash,
-    X,
+  EllipsisVertical,
+  Eye,
+  Filter,
+  Pencil,
+  RefreshCw,
+  Search,
+  Trash,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { HouseTypeLabel } from "../constants";
 import {
-    HasBusiness,
-    HasChildren,
-    HasElderly,
-    HasPregnant,
-    HasSick,
-    HouseType,
+  HasBusiness,
+  HasChildren,
+  HasElderly,
+  HasPregnant,
+  HasSick,
+  HouseType,
 } from "../enum";
 import { useDeleteResident, useResidents } from "../hooks";
 import type { Resident } from "../interfaces";
@@ -249,7 +249,7 @@ export default function ListResidents() {
         </span>
       ),
       key: "coordinates",
-      render: (_: any, record: Resident) => (
+      render: (_, record: Resident) => (
         <span className="text-[#000000] lg:text-[16px] text-[14px]">
           {record?.longitude} - {record?.latitude}
         </span>
@@ -279,7 +279,7 @@ export default function ListResidents() {
       ),
       dataIndex: "hasElderly",
       key: "hasElderly",
-      render: (_: any, record: Resident) => (
+      render: (_, record: Resident) => (
         <span className="text-[#000000] lg:text-[16px] text-[14px]">
           {record?.hasElderly === HasElderly.YES ? "Có" : "Không"}
         </span>
@@ -294,7 +294,7 @@ export default function ListResidents() {
       ),
       dataIndex: "hasChildren",
       key: "hasChildren",
-      render: (_: any, record: Resident) => (
+      render: (_, record: Resident) => (
         <span className="text-[#000000] lg:text-[16px] text-[14px]">
           {record?.hasChildren === HasChildren.YES ? "Có" : "Không"}
         </span>
@@ -309,7 +309,7 @@ export default function ListResidents() {
       ),
       dataIndex: "hasPregnantWomen",
       key: "hasPregnantWomen",
-      render: (_: any, record: Resident) => (
+      render: (_, record: Resident) => (
         <span className="text-[#000000] lg:text-[16px] text-[14px]">
           {record?.hasPregnantWomen === HasPregnant.YES ? "Có" : "Không"}
         </span>
@@ -324,7 +324,7 @@ export default function ListResidents() {
       ),
       dataIndex: "hasChronicDisease",
       key: "hasChronicDisease",
-      render: (_: any, record: Resident) => (
+      render: (_, record: Resident) => (
         <span className="text-[#000000] lg:text-[16px] text-[14px]">
           {record?.hasChronicDisease === HasSick.YES ? "Có" : "Không"}
         </span>
@@ -370,7 +370,7 @@ export default function ListResidents() {
       ),
       dataIndex: "hasBusiness",
       key: "hasBusiness",
-      render: (_: any, record: Resident) => (
+      render: (_, record: Resident) => (
         <div className="flex gap-2 justify-end">
           <span className="text-[#000000] lg:text-[16px] text-[14px]">
             {record?.hasBusiness === HasBusiness.YES ? "Có" : "Không"}

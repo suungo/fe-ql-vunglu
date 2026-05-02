@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { categoryOptions } from "../constants";
 import { useFloodDamageDetail, useUpdateFloodDamage } from "../hooks";
+import type { IUpdateFloodDamageRequest } from "../interfaces";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -43,7 +44,7 @@ export default function FormFloodDamages() {
   }, [floodDamageDetail, id, form]);
 
   const updateFloodDamage = useUpdateFloodDamage();
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: IUpdateFloodDamageRequest) => {
     setIsLoading(true);
 
     try {
@@ -52,7 +53,10 @@ export default function FormFloodDamages() {
         injuredCount: Number(values.injuredCount) || 0,
         deathCount: Number(values.deathCount) || 0,
         // Parse đúng định dạng tiền VND: loại bỏ dấu chấm phân cách hàng nghìn
-        estimatedValue: parseCurrency(values.estimatedValue, "VND"),
+        estimatedValue: parseCurrency(
+          String(values.estimatedValue ?? "0"),
+          "VND",
+        ),
       };
       const response = await updateFloodDamage.mutateAsync({
         id: Number(id),
@@ -65,11 +69,11 @@ export default function FormFloodDamages() {
         });
         navigate("/app/flood-damages-manager/list");
       }
-    } catch (error) {
-      const err = error as any;
+    } catch (error: unknown) {
+      const err = error as { message?: string } | undefined;
       notification.error({
         title: "Lỗi",
-        description: err.message || "Có lỗi xảy ra",
+        description: err?.message || "Có lỗi xảy ra",
       });
     } finally {
       setIsLoading(false);

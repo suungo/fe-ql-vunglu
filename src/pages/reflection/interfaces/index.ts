@@ -46,5 +46,5 @@ export interface CreateReflection {
 }
 
 export interface UpdateReflection extends CreateReflection {
-    id: number;
+  id: number;
 }

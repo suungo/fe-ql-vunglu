@@ -193,7 +193,7 @@ export default function FormanagerResidents({
 
   function LocationMarker() {
     useMapEvents({
-      click(e: L.LeafletMouseEvent) {
+      click(e: { latlng: { lat: number; lng: number } }) {
         fetchAddress(e.latlng.lat, e.latlng.lng);
       },
     });
@@ -210,19 +210,18 @@ export default function FormanagerResidents({
   const onFinish = async (values: CreateResident) => {
     setLoading(true);
     try {
-      let response;
       if (mode === "add") {
         const data = {
           ...values,
           address: address,
         };
-        response = await createResidentMutation.mutateAsync(data);
+        await createResidentMutation.mutateAsync(data);
       } else {
         const data = {
           ...values,
           address: address,
         };
-        response = await updateResidentMutation.mutateAsync({
+        await updateResidentMutation.mutateAsync({
           id: effectiveId!,
           value: data,
         });

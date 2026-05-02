@@ -6,7 +6,7 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(),
-    tailwindcss(),
+  tailwindcss(),
   ],
   resolve: {
     alias: {
@@ -24,12 +24,8 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      '/api_pcccr': {
-        target: 'https://v2.pcccr.vn',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api_pcccr/, ''),
-      },
+
     },
-    
+
   },
 })

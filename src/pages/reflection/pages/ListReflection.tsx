@@ -3,42 +3,42 @@ import useDebounce from "@/hooks/useDebounce";
 import { getProfileApi } from "@/pages/profile/api";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Button,
-  Drawer,
-  Dropdown,
-  Empty,
-  Input,
-  Modal,
-  Select,
-  Spin,
-  Table,
-  Tag,
-  Tooltip,
-  message,
+    Button,
+    Drawer,
+    Dropdown,
+    Empty,
+    Input,
+    Modal,
+    Select,
+    Spin,
+    Table,
+    Tag,
+    Tooltip,
+    message,
 } from "antd";
 import type { ColumnType } from "antd/es/table";
 import {
-  AlertTriangle,
-  CheckCheck,
-  CloudRain,
-  EllipsisVertical,
-  Eye,
-  Filter,
-  MapPin,
-  Pencil,
-  RefreshCw,
-  Search,
-  Settings,
-  ShieldAlert,
-  Trash,
-  X,
+    AlertTriangle,
+    CheckCheck,
+    CloudRain,
+    EllipsisVertical,
+    Eye,
+    Filter,
+    MapPin,
+    Pencil,
+    RefreshCw,
+    Search,
+    Settings,
+    ShieldAlert,
+    Trash,
+    X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  deleteReflectionApi,
-  getReflectionsApi,
-  updateReflectionStatusApi,
+    deleteReflectionApi,
+    getReflectionsApi,
+    updateReflectionStatusApi,
 } from "../api";
 import { Category, EventType, Priority, ReflectionStatus } from "../enum";
 import type { Reflection } from "../interfaces";
@@ -269,7 +269,7 @@ export default function ListReflection() {
               </span>
             ),
             key: "user",
-            render: (_: any, record: Reflection) => (
+            render: (_, record: Reflection) => (
               <div className="flex flex-col">
                 <span className="text-[#000000] lg:text-[14px] text-[12px] font-semibold line-clamp-1">
                   {record?.user?.fullName || "Khách"}
@@ -335,7 +335,7 @@ export default function ListReflection() {
         </span>
       ),
       key: "content",
-      render: (_: any, record: Reflection) => (
+      render: (_, record: Reflection) => (
         <div className="flex flex-col">
           <span className="text-[#000000] lg:text-[14px] text-[12px] line-clamp-1">
             {record?.content}
@@ -355,7 +355,7 @@ export default function ListReflection() {
         </span>
       ),
       key: "location",
-      render: (_: any, record: Reflection) => (
+      render: (_, record: Reflection) => (
         <span className="text-[#000000] lg:text-[14px] text-[12px] flex items-center gap-1">
           <MapPin size={14} className="shrink-0" />
           <span className="line-clamp-2">
@@ -388,7 +388,7 @@ export default function ListReflection() {
         </span>
       ),
       key: "status",
-      render: (_: any, record: Reflection) => (
+      render: (_, record: Reflection) => (
         <div className="flex gap-2 justify-end">
           <span className="text-[#000000] lg:text-[14px] text-[12px]">
             {getStatusTag(record?.status)}
@@ -442,7 +442,7 @@ export default function ListReflection() {
                                         "Cập nhật trạng thái thành công",
                                       );
                                       refetch();
-                                    } catch (error) {
+                                    } catch {
                                       message.error("Cập nhật thất bại");
                                     }
                                   },

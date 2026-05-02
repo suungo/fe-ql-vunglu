@@ -2,7 +2,7 @@
 
 // hook lấy danh sách hộ dân 
 
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { filterResidents } from "../apis"
 import { createResident, deleteResident, getResidentById, getResidents, updateResident } from "../apis"
 import type { CreateResident, UpdateResident } from "../interfaces"
@@ -18,14 +18,20 @@ export const useResidents = (filter: filterResidents) => {
 // hook thêm hộ dân 
 
 export const useCreateResident = () => {
+    const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (value: CreateResident) => createResident(value),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['residents'] });
+            
+        },
     })
 }
 
 // hook cập nhật hộ dân 
 
 export const useUpdateResident = () => {
+
     return useMutation({
         mutationFn: ({id, value}: {id: number, value: UpdateResident}) => updateResident(id, value),
     })

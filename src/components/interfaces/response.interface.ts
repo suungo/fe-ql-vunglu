@@ -7,11 +7,11 @@ export type Meta = {
   otalPages?: number;
 };
 
-// export type ApiResponse<T = any> = {
-//   statusCode: number;
-//   message: string;
-//   data?: T;
-// };
+export type ApiResponse<T> = {
+  statusCode: number;
+  message: string;
+  data?: T;
+};
 
 // Kiểu dữ liệu chung cho các API trả về response
 export type BaseResponse<T, Extra = unknown> = {
