@@ -1,44 +1,46 @@
 import { Role } from "@/enums";
 import useDebounce from "@/hooks/useDebounce";
 import { getProfileApi } from "@/pages/profile/api";
+import { exportToExcel, exportToWord } from "@/utils/exportUtils";
 import { useQuery } from "@tanstack/react-query";
 import {
-    Button,
-    Drawer,
-    Dropdown,
-    Empty,
-    Input,
-    Modal,
-    Select,
-    Spin,
-    Table,
-    Tag,
-    Tooltip,
-    message,
+  Button,
+  Drawer,
+  Dropdown,
+  Empty,
+  Input,
+  Modal,
+  Select,
+  Spin,
+  Table,
+  Tag,
+  Tooltip,
+  notification,
 } from "antd";
 import type { ColumnType } from "antd/es/table";
 import {
-    AlertTriangle,
-    CheckCheck,
-    CloudRain,
-    EllipsisVertical,
-    Eye,
-    Filter,
-    MapPin,
-    Pencil,
-    RefreshCw,
-    Search,
-    Settings,
-    ShieldAlert,
-    Trash,
-    X,
+  AlertTriangle,
+  CheckCheck,
+  CloudRain,
+  EllipsisVertical,
+  Eye,
+  FileSpreadsheet,
+  FileText,
+  Filter,
+  MapPin,
+  Pencil,
+  RefreshCw,
+  Search,
+  Settings,
+  ShieldAlert,
+  Trash,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-    deleteReflectionApi,
-    getReflectionsApi,
-    updateReflectionStatusApi,
+  deleteReflectionApi,
+  getReflectionsApi,
 } from "../api";
 import { Category, EventType, Priority, ReflectionStatus } from "../enum";
 import type { Reflection } from "../interfaces";
@@ -98,23 +100,19 @@ export default function ListReflection() {
 
   const isAdmin = profileData?.role?.roleCode === Role.ADMIN;
   const isManager = profileData?.role?.roleCode === Role.MANAGER;
+  const roleCode = profileData?.role?.roleCode;
 
   const getRoleName = (roleCode?: string) => {
     switch (roleCode) {
-      case Role.ADMIN:
-        return "Quản trị viên";
-      case Role.MANAGER:
-        return "Quản lý phường";
-      case Role.OFFICER:
-        return "Cán bộ phường";
-      case Role.LEADER:
-        return "Quản lý khu phố";
-      case Role.STAFF:
-        return "Nhân viên y tế";
-      case Role.RESIDENT:
-        return "Hộ dân / Cư dân";
-      default:
-        return "Chưa xác định";
+      case Role.ADMIN:    return "Quản trị viên";
+      case Role.MANAGER:  return "Quản lý phường";
+      case Role.OFFICER:  return "Cán bộ tăng cường";
+      case "INSPECTOR":   return "Hậu kiểm";
+      case "PATROL":      return "Cán bộ tuần tra";
+      case Role.LEADER:   return "Quản lý khu phố";
+      case Role.STAFF:    return "Nhân viên y tế";
+      case Role.RESIDENT: return "Hộ dân / Cư dân";
+      default:            return "Chưa xác định";
     }
   };
 
@@ -148,16 +146,153 @@ export default function ListReflection() {
     try {
       setIsDeleting(true);
       await deleteReflectionApi(idDelete);
-      message.success("Xóa phản ánh thành công");
+      notification.success({
+        title: "Thành công",
+        description: "Xóa phản ánh thành công",
+      });
       refetch();
     } catch (error) {
       console.error(error);
-      message.error("Xóa phản ánh thất bại");
+      notification.error({
+        title: "Thất bại",
+        description: "Xóa phản ánh thất bại",
+      });
     } finally {
       setIsDeleting(false);
       setIsOpenModalDelete(false);
       setIdDelete(null);
     }
+  };
+
+  const HEADER_MAP_RF: Record<string, string> = {
+    userName: "Người phản ánh",
+    category: "Danh mục",
+    priority: "Mức độ",
+    typeOfIncident: "Loại sự cố",
+    content: "Nội dung",
+    description: "Mô tả",
+    address: "Địa chỉ",
+    response: "Phản hồi",
+    status: "Trạng thái",
+  };
+
+  const WORD_WIDTHS_RF: Record<string, number> = {
+    userName: 100,
+    category: 80,
+    priority: 60,
+    typeOfIncident: 80,
+    content: 130,
+    description: 130,
+    address: 150,
+    response: 110,
+    status: 80,
+  };
+
+  const getCatText = (cat?: Category) => {
+    switch (cat) {
+      case Category.INFRASTRUCTURE:
+        return "Hạ tầng";
+      case Category.ENVIRONMENT:
+        return "Môi trường";
+      case Category.SECURITY:
+        return "An ninh trật tự";
+      default:
+        return "Khác";
+    }
+  };
+
+  const getPriorityText = (p?: Priority) => {
+    switch (p) {
+      case Priority.LOW:
+        return "Thấp";
+      case Priority.MEDIUM:
+        return "Trung bình";
+      case Priority.HIGH:
+        return "Cao";
+      default:
+        return "Chưa xác định";
+    }
+  };
+
+  const getStatusText = (s?: ReflectionStatus) => {
+    switch (s) {
+      case ReflectionStatus.PENDING:     return "Chờ xác minh";
+      case ReflectionStatus.VERIFIED:    return "Đã xác minh";
+      case ReflectionStatus.ASSIGNED:    return "Đã phân công";
+      case ReflectionStatus.IN_PROGRESS: return "Đang xử lý";
+      case ReflectionStatus.COMPLETED:   return "Chờ xác nhận";
+      case ReflectionStatus.RESOLVED:    return "Đã hoàn thành";
+      case ReflectionStatus.REJECTED:    return "Từ chối";
+      default:                           return "Mới";
+    }
+  };
+
+  const getEventTypeText = (e?: EventType) => {
+    switch (e) {
+      case EventType.RAIN:
+        return "Mưa";
+      case EventType.TIDE:
+        return "Mực nước";
+      case EventType.FLOOD:
+        return "Lũ lụt";
+      case EventType.DYKE_BREAK:
+        return "Vỡ đê";
+      case EventType.LANDSLIDE:
+        return "Sạt lở";
+      default:
+        return "Khác";
+    }
+  };
+
+  const formatRFData = (data: Reflection[]) =>
+    data.map((item) => ({
+      userName: item.user?.fullName || "Khách",
+      category: getCatText(item.category),
+      priority: getPriorityText(item.priority),
+      typeOfIncident: getEventTypeText(item.typeOfIncident),
+      content: item.content || "",
+      description: item.description || "",
+      address: item.address || `${item.lat}, ${item.lng}`,
+      response: item.response || "Chưa có phản hồi",
+      status: getStatusText(item.status),
+    }));
+
+  const handleExportExcelRF = () => {
+    const raw = reflections?.data || [];
+    if (!raw.length) {
+      notification.warning({
+        title: "Cảnh báo",
+        description: "Không có dữ liệu để xuất",
+      });
+      return;
+    }
+    exportToExcel(formatRFData(raw), "Danh_Sach_Phan_Anh", HEADER_MAP_RF);
+    notification.success({
+      title: "Thành công",
+      description: "Xuất file Excel thành công",
+    });
+  };
+
+  const handleExportWordRF = () => {
+    const raw = reflections?.data || [];
+    if (!raw.length) {
+      notification.warning({
+        title: "Cảnh báo",
+        description: "Không có dữ liệu để xuất",
+      });
+      return;
+    }
+    exportToWord(
+      formatRFData(raw),
+      "Danh_Sach_Phan_Anh",
+      HEADER_MAP_RF,
+      "DANH SÁCH PHẢN ÁNH / SỰ KIỆN",
+      WORD_WIDTHS_RF,
+    );
+    notification.success({
+      title: "Thành công",
+      description: "Xuất file Word thành công",
+    });
   };
 
   const getCategoryLabel = (cat?: Category) => {
@@ -203,18 +338,17 @@ export default function ListReflection() {
   };
 
   const getStatusTag = (status?: ReflectionStatus) => {
-    switch (status) {
-      case ReflectionStatus.PENDING:
-        return <Tag color="orange">Đang chờ xử lý</Tag>;
-      case ReflectionStatus.IN_PROGRESS:
-        return <Tag color="blue">Đang xử lý</Tag>;
-      case ReflectionStatus.RESOLVED:
-        return <Tag color="green">Đã xử lý</Tag>;
-      case ReflectionStatus.REJECTED:
-        return <Tag color="red">Từ chối</Tag>;
-      default:
-        return <Tag color="default">Mới</Tag>;
-    }
+    const cfg: Record<string, { color: string; label: string }> = {
+      PENDING:     { color: "orange",   label: "Chờ xác minh" },
+      VERIFIED:    { color: "blue",     label: "Đã xác minh" },
+      ASSIGNED:    { color: "purple",   label: "Đã phân công" },
+      IN_PROGRESS: { color: "geekblue", label: "Đang xử lý" },
+      COMPLETED:   { color: "cyan",     label: "Chờ xác nhận" },
+      RESOLVED:    { color: "green",    label: "Đã hoàn thành" },
+      REJECTED:    { color: "red",      label: "Từ chối" },
+    };
+    const c = cfg[status ?? ""] ?? { color: "default", label: "Mới" };
+    return <Tag color={c.color}>{c.label}</Tag>;
   };
 
   const getEventTypeLabel = (eventType?: EventType) => {
@@ -419,43 +553,26 @@ export default function ListReflection() {
                       </div>
                     ),
                   },
-                  // Chỉ hiển thị nút Hoàn tất nếu đang xử lý và là Quản lý
-                  ...(record?.status === ReflectionStatus.IN_PROGRESS &&
-                  isManager
-                    ? [
-                        {
-                          key: "resolve",
-                          label: (
-                            <div
-                              onClick={() => {
-                                Modal.confirm({
-                                  title: "Xác nhận hoàn tất sự cố",
-                                  content:
-                                    "Bạn có chắc chắn sự cố này đã được xử lý xong?",
-                                  onOk: async () => {
-                                    try {
-                                      await updateReflectionStatusApi(
-                                        record.id as number,
-                                        ReflectionStatus.RESOLVED,
-                                      );
-                                      message.success(
-                                        "Cập nhật trạng thái thành công",
-                                      );
-                                      refetch();
-                                    } catch {
-                                      message.error("Cập nhật thất bại");
-                                    }
-                                  },
-                                });
-                              }}
-                              className="text-[16px] flex items-center gap-2 text-green-600 cursor-pointer"
-                            >
-                              <CheckCheck size={16} /> Hoàn tất
-                            </div>
-                          ),
-                        },
-                      ]
-                    : []),
+                  // Nút xem chi tiết — thực hiện workflow tại đó
+                  ...((
+                    (record?.status === ReflectionStatus.PENDING && roleCode === "OFFICER") ||
+                    ((record?.status === ReflectionStatus.PENDING || record?.status === ReflectionStatus.VERIFIED) && (isManager || isAdmin)) ||
+                    (record?.status === ReflectionStatus.ASSIGNED && (roleCode === "INSPECTOR" || isManager)) ||
+                    (record?.status === ReflectionStatus.IN_PROGRESS && roleCode === "PATROL") ||
+                    (record?.status === ReflectionStatus.COMPLETED && (roleCode === "INSPECTOR" || isManager))
+                  ) ? [
+                    {
+                      key: "action",
+                      label: (
+                        <div
+                          onClick={() => navigate(`/app/reflection-manager/detail/${record?.id}`)}
+                          className="text-[16px] flex items-center gap-2 text-purple-600 cursor-pointer font-semibold"
+                        >
+                          <CheckCheck size={16} /> Thực hiện hành động
+                        </div>
+                      ),
+                    },
+                  ] : []),
                   {
                     key: "delete",
                     disabled:
@@ -534,10 +651,13 @@ export default function ListReflection() {
             value={status}
             onChange={(value) => setStatus(value)}
             options={[
-              { value: ReflectionStatus.PENDING, label: "Đang chờ xử lý" },
+              { value: ReflectionStatus.PENDING,     label: "Chờ xác minh" },
+              { value: ReflectionStatus.VERIFIED,    label: "Đã xác minh" },
+              { value: ReflectionStatus.ASSIGNED,    label: "Đã phân công" },
               { value: ReflectionStatus.IN_PROGRESS, label: "Đang xử lý" },
-              { value: ReflectionStatus.RESOLVED, label: "Đã xử lý" },
-              { value: ReflectionStatus.REJECTED, label: "Từ chối" },
+              { value: ReflectionStatus.COMPLETED,   label: "Chờ xác nhận" },
+              { value: ReflectionStatus.RESOLVED,    label: "Đã hoàn thành" },
+              { value: ReflectionStatus.REJECTED,    label: "Từ chối" },
             ]}
           />
         </div>
@@ -602,13 +722,31 @@ export default function ListReflection() {
                 Danh sách phản ánh, báo cáo sự kiện
               </div>
             </div>
-            <Button
-              onClick={() => navigate("/app/reflection-manager/create")}
-              type="primary"
-              className="text-[16px] w-full md:w-auto font-medium h-9!"
-            >
-              + Đăng phản ánh
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              {(isAdmin || isManager) && (
+                <>
+                  <Button
+                    onClick={handleExportExcelRF}
+                    className="text-[16px] font-medium h-9! border-green-600 text-green-600 hover:bg-green-50"
+                  >
+                    <FileSpreadsheet size={16} /> Xuất Excel
+                  </Button>
+                  <Button
+                    onClick={handleExportWordRF}
+                    className="text-[16px] font-medium h-9! border-blue-600 text-blue-600 hover:bg-blue-50"
+                  >
+                    <FileText size={16} /> Xuất Word
+                  </Button>
+                </>
+              )}
+              <Button
+                onClick={() => navigate("/app/reflection-manager/create")}
+                type="primary"
+                className="text-[16px] w-full md:w-auto font-medium h-9!"
+              >
+                + Đăng phản ánh
+              </Button>
+            </div>
           </div>
           <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between mb-4">
             <div className="flex items-center gap-2 w-full md:w-auto">
@@ -645,14 +783,7 @@ export default function ListReflection() {
             <div className="overflow-hidden rounded-xl border border-slate-100 bg-white">
               <Table
                 loading={isLoading}
-                dataSource={
-                  isManager
-                    ? reflections?.data?.filter(
-                        (r: Reflection) =>
-                          r.status === ReflectionStatus.RESOLVED,
-                      )
-                    : reflections?.data
-                }
+                dataSource={reflections?.data}
                 columns={columns as ColumnType<Reflection>[]}
                 rowKey={(record) =>
                   record?.id?.toString() || Math.random().toString()

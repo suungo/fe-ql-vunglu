@@ -1,4 +1,17 @@
-import { Button, Card, Descriptions, Empty, Spin, Table, Tag } from "antd";
+import {
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Empty,
+  Row,
+  Select,
+  Spin,
+  Statistic,
+  Table,
+  Tag,
+  Timeline,
+} from "antd";
 import type { ColumnsType } from "antd/es/table";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -14,14 +27,35 @@ import { useNavigate, useParams } from "react-router-dom";
 
 // Fix Leaflet icon issue
 import { formatCurrencyNumber } from "@/components/utils/currency";
+import { Role } from "@/enums";
 import { DamageCategory, DamageStatus } from "@/pages/floodDamages/enum";
 import type { IFloodDamage } from "@/pages/floodDamages/interfaces";
+import dayjs from "dayjs";
 import iconRetina from "leaflet/dist/images/marker-icon-2x.png";
 import iconMarker from "leaflet/dist/images/marker-icon.png";
 import iconShadow from "leaflet/dist/images/marker-shadow.png";
+import { useMemo, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { HouseTypeLabel } from "../constants";
 import type { HouseType } from "../enum";
-import { useResidentById } from "../hooks";
+import { useResidentById, useResidentVerificationHistory } from "../hooks";
+import type { ResidentVerificationHistoryItem } from "../apis";
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
+  CalendarOutlined,
+  PhoneOutlined,
+} from "@ant-design/icons";
 
 const categoryConfig: Record<DamageCategory, { label: string; color: string }> =
   {
@@ -54,6 +88,100 @@ export default function DetailResidents() {
   const { data, isLoading } = useResidentById(Number(id));
   const resident = data?.data;
   const damages = resident?.floodDamages || [];
+
+  const { data: verificationHistory, isLoading: verifyLoading } = useResidentVerificationHistory(resident?.phoneNumber);
+
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const isAdminOrManager =
+    user?.role?.roleCode === Role.ADMIN ||
+    user?.role?.roleCode === Role.MANAGER;
+
+  const stats = useMemo(() => {
+    if (!damages) return null;
+    const totalEstimatedValue = damages.reduce(
+      (sum, d) => sum + (d.estimatedValue || 0),
+      0,
+    );
+    const totalInjured = damages.reduce(
+      (sum, d) => sum + (d.injuredCount || 0),
+      0,
+    );
+    const totalDeaths = damages.reduce(
+      (sum, d) => sum + (d.deathCount || 0),
+      0,
+    );
+    const uniqueReflections = new Set(
+      damages.map((d) => d.reflectionId).filter(Boolean),
+    ).size;
+
+    return {
+      totalEstimatedValue,
+      totalInjured,
+      totalDeaths,
+      uniqueReflections,
+      totalDamages: damages.length,
+    };
+  }, [damages]);
+
+  const [timeRange, setTimeRange] = useState<"week" | "month" | "year">("year");
+
+  const chartData = useMemo(() => {
+    if (!damages) return [];
+
+    const now = dayjs();
+    let aggregated: Record<string, number> = {};
+
+    if (timeRange === "week") {
+      // 7 ngày gần nhất
+      for (let i = 6; i >= 0; i--) {
+        const dateStr = now.subtract(i, "day").format("DD/MM");
+        aggregated[dateStr] = 0;
+      }
+      damages.forEach((d) => {
+        const dDate = dayjs(d.createdAt);
+        if (now.diff(dDate, "day") <= 6 && now.diff(dDate, "day") >= 0) {
+          const dateStr = dDate.format("DD/MM");
+          if (aggregated[dateStr] !== undefined) {
+            aggregated[dateStr] += d.estimatedValue || 0;
+          }
+        }
+      });
+    } else if (timeRange === "month") {
+      // Theo tháng (4 tuần) của tháng hiện tại
+      aggregated = {
+        "Tuần 1": 0,
+        "Tuần 2": 0,
+        "Tuần 3": 0,
+        "Tuần 4": 0,
+      };
+      damages.forEach((d) => {
+        const dDate = dayjs(d.createdAt);
+        if (dDate.isSame(now, "month")) {
+          const date = dDate.date();
+          if (date <= 7) aggregated["Tuần 1"] += d.estimatedValue || 0;
+          else if (date <= 14) aggregated["Tuần 2"] += d.estimatedValue || 0;
+          else if (date <= 21) aggregated["Tuần 3"] += d.estimatedValue || 0;
+          else aggregated["Tuần 4"] += d.estimatedValue || 0;
+        }
+      });
+    } else {
+      // Năm (12 tháng) của năm hiện tại
+      for (let i = 1; i <= 12; i++) {
+        aggregated[`Tháng ${i}`] = 0;
+      }
+      damages.forEach((d) => {
+        const dDate = dayjs(d.createdAt);
+        if (dDate.isSame(now, "year")) {
+          aggregated[`Tháng ${dDate.month() + 1}`] += d.estimatedValue || 0;
+        }
+      });
+    }
+
+    return Object.keys(aggregated).map((key) => ({
+      name: key,
+      value: aggregated[key],
+    }));
+  }, [damages, timeRange]);
 
   const damageColumns: ColumnsType<IFloodDamage> = [
     {
@@ -148,6 +276,111 @@ export default function DetailResidents() {
         />
         <h1 className="text-xl font-bold m-0">Chi tiết hộ dân</h1>
       </div>
+      {/* Block 4: Biểu đồ thống kê */}
+      {isAdminOrManager && (
+        <Card
+          title="Thống kê thiệt hại ước tính"
+          className="shadow-sm rounded-xl border border-gray-100"
+          extra={
+            <Select
+              value={timeRange}
+              onChange={setTimeRange}
+              options={[
+                { value: "week", label: "7 ngày qua" },
+                { value: "month", label: "Tháng này" },
+                { value: "year", label: "Năm nay" },
+              ]}
+              style={{ width: 120 }}
+            />
+          }
+        >
+          <div className="w-full h-[350px] flex items-center justify-center">
+            {damages.length === 0 ? (
+              <Empty description="Chưa có dữ liệu thống kê" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 40, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(val) =>
+                      new Intl.NumberFormat("vi-VN", {
+                        notation: "compact",
+                        compactDisplay: "short",
+                      }).format(val)
+                    }
+                  />
+                  <RechartsTooltip
+                    formatter={(value: any) =>
+                      new Intl.NumberFormat("vi-VN", {
+                        style: "currency",
+                        currency: "VND",
+                      }).format(Number(value) || 0)
+                    }
+                    cursor={{ fill: "rgba(0, 0, 0, 0.05)" }}
+                  />
+                  <Legend />
+                  <Bar
+                    dataKey="value"
+                    name="Giá trị thiệt hại (VND)"
+                    fill="#1677ff"
+                    radius={[4, 4, 0, 0]}
+                    barSize={40}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </Card>
+      )}
+      {/* Statistics for Admin/Manager */}
+      {isAdminOrManager && stats && (
+        <Card className="shadow-sm rounded-xl border border-gray-100 bg-blue-50/20">
+          <Row gutter={[16, 16]}>
+            <Col xs={12} sm={8} md={4}>
+              <Statistic
+                title="Số lượng phản ánh"
+                value={stats.uniqueReflections}
+                valueStyle={{ color: "#3f8600", fontWeight: "bold" }}
+              />
+            </Col>
+            <Col xs={12} sm={8} md={4}>
+              <Statistic
+                title="Số vụ thiệt hại"
+                value={stats.totalDamages}
+                valueStyle={{ color: "#cf1322", fontWeight: "bold" }}
+              />
+            </Col>
+            <Col xs={24} sm={16} md={8}>
+              <Statistic
+                title="Tổng giá trị thiệt hại ước tính"
+                value={stats.totalEstimatedValue}
+                suffix="VND"
+                valueStyle={{ color: "#1677ff", fontWeight: "bold" }}
+              />
+            </Col>
+            <Col xs={12} sm={8} md={4}>
+              <Statistic
+                title="Bị thương"
+                value={stats.totalInjured}
+                valueStyle={{ color: "#faad14", fontWeight: "bold" }}
+              />
+            </Col>
+            <Col xs={12} sm={8} md={4}>
+              <Statistic
+                title="Tử vong"
+                value={stats.totalDeaths}
+                valueStyle={{ color: "#ff4d4f", fontWeight: "bold" }}
+              />
+            </Col>
+          </Row>
+        </Card>
+      )}
 
       {/* 2 Blocks: Small screens = 1 column (vertical), Large screens = 2 columns (horizontal) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
@@ -283,9 +516,9 @@ export default function DetailResidents() {
         </div>
       </Card>
 
-      {/* Block 4: Thiệt hại liên quan */}
+      {/* Block 5: Thiệt hại liên quan */}
       <Card
-        title="Thiệt hại liên quan"
+        title="Danh sách thiệt hại liên quan"
         className="shadow-sm rounded-xl border border-gray-100"
       >
         {damages.length === 0 ? (
@@ -302,6 +535,117 @@ export default function DetailResidents() {
             size="middle"
             bordered
           />
+        )}
+      </Card>
+
+      {/* Block 6: Lịch sử xác thực */}
+      <Card
+        title={
+          <div className="flex items-center gap-2">
+            <span>🔐 Lịch sử xác thực cư dân</span>
+            {verificationHistory?.total ? (
+              <Tag color="blue">{verificationHistory.total} lần</Tag>
+            ) : null}
+          </div>
+        }
+        className="shadow-sm rounded-xl border border-gray-100"
+      >
+        {verifyLoading ? (
+          <div className="flex justify-center py-8">
+            <Spin tip="Đang tải lịch sử xác thực..." />
+          </div>
+        ) : !verificationHistory?.data?.length ? (
+          <Empty
+            description="Chưa có lịch sử xác thực nào cho hộ dân này"
+            className="py-6"
+          />
+        ) : (
+          <div className="space-y-4">
+            {/* Timeline view */}
+            <Timeline
+              items={(verificationHistory.data as ResidentVerificationHistoryItem[]).slice(0, 5).map((item) => ({
+                color: item.status === 'APPROVED' ? 'green' : item.status === 'REJECTED' ? 'red' : 'orange',
+                dot: item.status === 'APPROVED'
+                  ? <CheckCircleOutlined />
+                  : item.status === 'REJECTED'
+                    ? <CloseCircleOutlined />
+                    : <ClockCircleOutlined />,
+                children: (
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {item.status === 'APPROVED'
+                        ? <Tag color="success" icon={<CheckCircleOutlined />}>Đã duyệt</Tag>
+                        : item.status === 'REJECTED'
+                          ? <Tag color="error" icon={<CloseCircleOutlined />}>Từ chối</Tag>
+                          : <Tag color="warning" icon={<ClockCircleOutlined />}>Chờ duyệt</Tag>
+                      }
+                      <span className="text-blue-600 text-sm font-medium">Hệ thống xác thực cư dân Phường Tam Bình</span>
+                      {item.isMatchedContact
+                        ? <Tag color="success" icon={<CheckCircleOutlined />} className="text-xs">Khớp hệ thống</Tag>
+                        : <Tag color="error" icon={<CloseCircleOutlined />} className="text-xs">SĐT Lạ</Tag>
+                      }
+                    </div>
+                    <div className="text-gray-500 text-sm mt-1">
+                      <PhoneOutlined className="mr-1" />{item.phoneNumber}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      <CalendarOutlined className="mr-1" />
+                      Gửi: {dayjs(item.createdAt).format('HH:mm DD/MM/YYYY')}
+                      {item.updatedAt && ` • Xử lý: ${dayjs(item.updatedAt).format('HH:mm DD/MM/YYYY')}`}
+                    </div>
+                  </div>
+                ),
+              }))}
+            />
+
+            {/* Full table */}
+            <Table
+              dataSource={verificationHistory.data as ResidentVerificationHistoryItem[]}
+              rowKey="id"
+              size="small"
+              bordered
+              pagination={{ pageSize: 5 }}
+              columns={[
+                {
+                  title: 'Mã đơn',
+                  dataIndex: 'id',
+                  width: 80,
+                  render: (val: number) => <span className="text-gray-400 text-xs">#{val}</span>,
+                },
+                {
+                  title: 'Trạng thái',
+                  dataIndex: 'status',
+                  render: (status: string) => {
+                    if (status === 'APPROVED') return <Tag icon={<CheckCircleOutlined />} color="success">Đã duyệt</Tag>;
+                    if (status === 'REJECTED') return <Tag icon={<CloseCircleOutlined />} color="error">Từ chối</Tag>;
+                    return <Tag icon={<ClockCircleOutlined />} color="warning">Chờ duyệt</Tag>;
+                  },
+                },
+                {
+                  title: 'Bên xác thực',
+                  key: 'verifier',
+                  render: () => <span className="text-blue-600 font-medium text-sm">HT Xác thực cư dân</span>,
+                },
+                {
+                  title: 'Kết quả đối chiếu',
+                  dataIndex: 'isMatchedContact',
+                  render: (matched: boolean, record: ResidentVerificationHistoryItem) => matched
+                    ? <Tag color="success" icon={<CheckCircleOutlined />}>Khớp hệ thống</Tag>
+                    : <Tag color="error" icon={<CloseCircleOutlined />} title={record.matchedMessage}>SĐT Lạ</Tag>,
+                },
+                {
+                  title: 'Ngày gửi',
+                  dataIndex: 'createdAt',
+                  render: (date: string) => date ? dayjs(date).format('DD/MM/YYYY HH:mm') : '—',
+                },
+                {
+                  title: 'Ngày xử lý',
+                  dataIndex: 'updatedAt',
+                  render: (date: string) => date ? dayjs(date).format('DD/MM/YYYY HH:mm') : '—',
+                },
+              ]}
+            />
+          </div>
         )}
       </Card>
     </div>

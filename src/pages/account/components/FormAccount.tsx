@@ -1,22 +1,22 @@
 import {
-    Button,
-    Form,
-    Input,
-    message,
-    notification,
-    type FormProps,
+  Button,
+  Form,
+  Input,
+  message,
+  notification,
+  type FormProps,
 } from "antd";
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { registerApi } from "../apis";
-import type { RegisterRequest } from "../interfaces";
+import type { AccountRequest } from "../interfaces";
 
-export default function FormRegister() {
+export default function FormAccount() {
   const [form] = Form.useForm();
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const handleRegister: FormProps<RegisterRequest>["onFinish"] = async (
+  const handleRegister: FormProps<AccountRequest>["onFinish"] = async (
     values,
   ) => {
     setIsLoading(true);
@@ -33,7 +33,7 @@ export default function FormRegister() {
           message: "Thành công",
           description: response.message,
         });
-        navigate("/login");
+        navigate("/app/account-manager/list");
       } else {
         notification.error({
           message: "Thất bại",
@@ -41,7 +41,13 @@ export default function FormRegister() {
         });
       }
     } catch (error: unknown) {
-      const errorMsg = (error as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message || (error as { message?: string }).message;
+      const errorMsg =
+        (
+          error as {
+            response?: { data?: { message?: string } };
+            message?: string;
+          }
+        ).response?.data?.message || (error as { message?: string }).message;
       message.error(Array.isArray(errorMsg) ? errorMsg[0] : errorMsg);
     } finally {
       setIsLoading(false);
@@ -63,7 +69,7 @@ export default function FormRegister() {
           >
             <div className=" ">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <Form.Item<RegisterRequest>
+                <Form.Item<AccountRequest>
                   required={false}
                   name="fullName"
                   label={
@@ -126,7 +132,7 @@ export default function FormRegister() {
                   />
                 </Form.Item>
 
-                <Form.Item<RegisterRequest>
+                <Form.Item<AccountRequest>
                   name="phoneNumber"
                   required={false}
                   label={
@@ -168,7 +174,7 @@ export default function FormRegister() {
                 </Form.Item>
               </div>
 
-              <Form.Item<RegisterRequest>
+              <Form.Item<AccountRequest>
                 name="email"
                 required={false}
                 className="lg:[&_.ant-form-item-explain-error]:w-[491px] md:[&_.ant-form-item-explain-error]:w-[400px] [&_.ant-form-item-explain-error]:w-[315px]"
@@ -214,7 +220,7 @@ export default function FormRegister() {
                 />
               </Form.Item>
               <div className="grid lg:grid-cols-2 gap-4 grid-cols-1">
-                <Form.Item<RegisterRequest>
+                <Form.Item<AccountRequest>
                   required={false}
                   name="password"
                   label={

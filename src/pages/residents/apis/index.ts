@@ -1,9 +1,38 @@
+import axios from "axios"
 import { BASE_URL } from "@/apis"
 import type { ApiResponse, PaginatedResponse } from "@/components/interfaces/response.interface"
 import type { HasBusiness, HasChildren, HasElderly, HasPregnant, HasSick } from "../enum"
 import type { CreateResident, Resident, UpdateResident } from "../interfaces"
 
 const RESIDENTS_API = '/residents'
+
+// Instance riêng để gọi đến hệ thống xác thực dân cư
+const RESIDENT_VERIFY_URL = axios.create({
+  baseURL: window.location.hostname === 'ql-vunglu.site'
+    ? 'https://ql-vunglu.site/api-dancu/v1'
+    : 'http://localhost:3002/api-dancu/v1',
+  timeout: 10000,
+});
+
+export interface ResidentVerificationHistoryItem {
+  id: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  fullName: string;
+  phoneNumber: string;
+  address: string;
+  isMatchedContact: boolean;
+  matchedMessage: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// API lấy lịch sử xác thực cư dân theo phoneNumber
+export const getResidentVerificationHistory = async (phoneNumber: string): Promise<{ data: ResidentVerificationHistoryItem[], total: number }> => {
+  const response = await RESIDENT_VERIFY_URL.get('/verifications', {
+    params: { phoneNumber }
+  });
+  return response.data;
+};
 
 export interface filterResidents {
     page: number

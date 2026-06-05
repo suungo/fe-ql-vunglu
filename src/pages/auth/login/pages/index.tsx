@@ -1,4 +1,5 @@
 import { getDeviceInfo, getOrCreateDeviceId } from "@/utils/device";
+import { setupWebPushNotifications } from "@/utils/pushNotification";
 import { Button, Form, Input, notification } from "antd";
 import { AlertTriangle, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
@@ -36,6 +37,11 @@ export default function Login() {
           localStorage.setItem("deviceId", response.data.deviceId);
         }
 
+        // 🔥 Đăng ký Web Push Notifications
+        setupWebPushNotifications(deviceId).catch((err) => {
+          console.error("❌ Lỗi cấu hình Web Push Notifications:", err);
+        });
+
         notification.success({
           message: "Thành công",
           description: response?.message,
@@ -67,10 +73,10 @@ export default function Login() {
   };
   return (
     <>
-      <div className="w-full h-screen bg-[url('/image-auth.png')] bg-no-repeat  bg-left bg-cover relative overflow-hidden">
-        <div className="z-10 flex items-center justify-center min-h-screen p-4">
+      <div className="w-full min-h-screen bg-[url('/image-auth.png')] bg-no-repeat bg-left bg-cover relative overflow-y-auto">
+        <div className="z-10 flex items-center justify-center min-h-screen p-4 py-8">
           <div className="z-50 p-6 bg-white rounded-[20px] shadow-sm lg:w-[655px] md:w-[555px] w-[335px] transition-all duration-100 ease-in-out">
-            <div className="relative flex justify-center mb-2 bg-[#FAFAFA]! gap-1">
+            <div className="relative flex justify-center mb-2 gap-1">
               <Link
                 to="/messages-realtime"
                 className="absolute right-0 top-1 inline-flex items-center gap-1.5 rounded-[8px] bg-[#e53935] px-2 py-1.5 text-[10px] font-extrabold tracking-wide text-white shadow-md transition hover:bg-[#d32f2f] focus:outline-none focus:ring-2 focus:ring-[#e53935]/40 sm:gap-2 sm:px-3 sm:py-2 sm:text-[12px]"
@@ -80,12 +86,14 @@ export default function Login() {
                 <AlertTriangle className="shrink-0" size={16} />
                 KHẨN CẤP
               </Link>
-              <img
-                loading="lazy"
-                alt="Image Auth"
-                className="lg:w-[217px] lg:h-[139px] md:w-[143px] md:h-[90px] w-[101px] rounded-[10px] h-[70px] mix-blend-multiply"
-                src="/image-logo.png"
-              />
+              <div className="lg:w-[180px] lg:h-[180px] w-[120px] h-[120px] rounded-full overflow-hidden flex items-center justify-center shrink-0 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100/50">
+                <img
+                  loading="lazy"
+                  alt="Image Auth"
+                  className="w-[105%] h-[105%] max-w-[105%] object-cover"
+                  src="/image-logo.png"
+                />
+              </div>
             </div>
             <h3 className="lg:text-[30px] text-[24px] mb-2 text-center font-semibold text-[#144c65]">
               Đăng nhập tài khoản của bạn
@@ -220,7 +228,7 @@ export default function Login() {
                 </Button>
               </Form.Item>
 
-              {/* <Form.Item
+              <Form.Item
                 className="text-center mb-0! flex items-center justify-center"
                 label={null}
               >
@@ -234,10 +242,10 @@ export default function Login() {
                   </Link>{" "}
                   tại đây
                 </span>
-              </Form.Item> */}
+              </Form.Item>
               <p className="text-[#000000] text-[14px] text-center">
-                Trường hợp khấn cấp vui lòng nhấp vào nút{" "}
-                <span className="text-[#D32F2F]">khấn cấp</span> ở trên để được
+                Trường hợp khẩn cấp vui lòng nhấp vào nút{" "}
+                <span className="text-[#D32F2F]">khẩn cấp</span> ở trên để được
                 giúp đỡ trực tiếp
               </p>
             </Form>

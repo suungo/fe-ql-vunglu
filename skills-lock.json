@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "vercel-composition-patterns": {
+      "source": "d:\\To-work\\IXE\\web_ixe_agent\\.agents\\skills\\vercel-composition-patterns",
+      "sourceType": "local",
+      "computedHash": "b47c2728f12d52a7e7b65149ed995dfca84fa69f2d71a992082380462fb13f30"
+    }
+  }
+}

@@ -32,5 +32,4 @@ export interface CreateHumanResources {
 
 
 export interface UpdateHumanResources extends CreateHumanResources {
-  id: number
 }

@@ -24,6 +24,8 @@ import {
   Search,
   Trash,
   X,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -38,8 +40,11 @@ import {
 } from "../enum";
 import { useDeleteResident, useResidents } from "../hooks";
 import type { Resident } from "../interfaces";
+import { exportToExcel, exportToWord } from "@/utils/exportUtils";
+import { Role } from "@/enums";
 
 export default function ListResidents() {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { styles } = useStyle();
@@ -163,6 +168,75 @@ export default function ListResidents() {
         });
       }
     }
+  };
+
+  const HEADER_MAP = {
+    residentCode: "Mã hộ dân",
+    fullName: "Tên chủ hộ",
+    phoneNumber: "Số điện thoại",
+    email: "Email",
+    address: "Địa chỉ",
+    longitude: "Kinh độ",
+    latitude: "Vĩ độ",
+    numberOfMembers: "Số TV",
+    hasElderly: "Người già",
+    hasChildren: "Trẻ em",
+    hasPregnantWomen: "PN mang thai",
+    hasChronicDisease: "Bệnh nền",
+    houseType: "Loại nhà",
+    numberOfFloors: "Số tầng",
+    hasBusiness: "Kinh doanh",
+  };
+
+  const WORD_COL_WIDTHS: Record<string, number> = {
+    residentCode: 50,
+    fullName: 80,
+    phoneNumber: 65,
+    email: 100,
+    address: 120,
+    longitude: 50,
+    latitude: 50,
+    numberOfMembers: 30,
+    hasElderly: 40,
+    hasChildren: 40,
+    hasPregnantWomen: 50,
+    hasChronicDisease: 40,
+    houseType: 70,
+    numberOfFloors: 30,
+    hasBusiness: 40,
+  };
+
+  const formatExportData = (data: Resident[]) => {
+    return data.map((item) => ({
+      ...item,
+      hasElderly: item.hasElderly === HasElderly.YES ? "Có" : "Không",
+      hasChildren: item.hasChildren === HasChildren.YES ? "Có" : "Không",
+      hasPregnantWomen:
+        item.hasPregnantWomen === HasPregnant.YES ? "Có" : "Không",
+      hasChronicDisease: item.hasChronicDisease === HasSick.YES ? "Có" : "Không",
+      hasBusiness: item.hasBusiness === HasBusiness.YES ? "Có" : "Không",
+      houseType: HouseTypeLabel[item.houseType],
+    }));
+  };
+
+  const handleExportExcel = () => {
+    if (!ListResidents?.data || ListResidents.data.length === 0) {
+      notification.warning({ message: "Không có dữ liệu để xuất" });
+      return;
+    }
+    const dataToExport = formatExportData(ListResidents.data);
+    exportToExcel(dataToExport, "Danh_Sach_Ho_Dan", HEADER_MAP);
+    notification.success({ message: "Xuất file Excel thành công" });
+  };
+
+  const handleExportWord = () => {
+    if (!ListResidents?.data || ListResidents.data.length === 0) {
+      notification.warning({ message: "Không có dữ liệu để xuất" });
+      return;
+    }
+    const dataToExport = formatExportData(ListResidents.data);
+    exportToWord(dataToExport, "Danh_Sach_Ho_Dan", HEADER_MAP, "DANH SÁCH HỘ DÂN", WORD_COL_WIDTHS);
+    notification.success({ message: "Xuất file Word thành công" });
   };
 
   const columns: ColumnType<Resident>[] = [
@@ -627,15 +701,33 @@ export default function ListResidents() {
                 Danh sách hộ dân
               </div>
             </div>
-            <Button
-              onClick={() => {
-                navigate("/app/residents-manager/create");
-              }}
-              type="primary"
-              className="text-[16px] font-medium h-9!"
-            >
-              + Thêm hộ dân
-            </Button>
+            <div className="flex gap-2">
+              {(user?.role?.roleCode === Role.MANAGER || user?.role?.roleCode === Role.ADMIN) && (
+                <>
+                  <Button
+                    onClick={handleExportExcel}
+                    className="text-[16px] font-medium h-9! border-green-600 text-green-600 hover:bg-green-50"
+                  >
+                    <FileSpreadsheet size={16} /> Xuất Excel
+                  </Button>
+                  <Button
+                    onClick={handleExportWord}
+                    className="text-[16px] font-medium h-9! border-blue-600 text-blue-600 hover:bg-blue-50"
+                  >
+                    <FileText size={16} /> Xuất Word
+                  </Button>
+                </>
+              )}
+              <Button
+                onClick={() => {
+                  navigate("/app/residents-manager/create");
+                }}
+                type="primary"
+                className="text-[16px] font-medium h-9!"
+              >
+                + Thêm hộ dân
+              </Button>
+            </div>
           </div>
           <div className="flex items-center gap-2 justify-between mb-2">
             <div className="flex items-center gap-2">

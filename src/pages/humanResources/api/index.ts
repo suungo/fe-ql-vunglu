@@ -1,9 +1,39 @@
+import axios from "axios";
 import { BASE_URL } from "@/apis"
 import type { ApiResponse, PaginatedResponse } from "@/components/interfaces/response.interface"
 import type { CreateHumanResources, HumanResources, UpdateHumanResources } from "../interfaces"
 
 // Tạo biến môi trường 
 const HUMANRESOURCE_URL = '/human-resources'
+
+// Instance riêng để gọi đến hệ thống xác thực nhân sự
+const HR_VERIFY_URL = axios.create({
+  baseURL: window.location.hostname === 'ql-vunglu.site'
+    ? 'https://ql-vunglu.site/api-nhansu/v1'
+    : 'http://localhost:3003/api-nhansu/v1',
+  timeout: 10000,
+});
+
+export interface VerificationHistoryItem {
+  id: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reason: string;
+  createDate: string;
+  updateDate: string;
+  humanResource: {
+    employeeCode: string;
+    fullName: string;
+    position: string;
+  };
+}
+
+// API lấy lịch sử xác thực nhân sự theo employeeCode
+export const getHRVerificationHistory = async (employeeCode: string): Promise<{ data: VerificationHistoryItem[], total: number }> => {
+  const response = await HR_VERIFY_URL.get('/verifications', {
+    params: { employeeCode }
+  });
+  return response.data;
+};
 
 // API thêm nhân sự 
 export const createHumanResource = async (value: CreateHumanResources) => {

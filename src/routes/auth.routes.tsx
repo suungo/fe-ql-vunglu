@@ -4,6 +4,7 @@ import type { RouteObject } from "react-router-dom";
 import GuestRoute from "./guestRoute.routes";
 
 const LoginPage = React.lazy(() => import("@/pages/auth/login/pages"));
+const RegisterPage = React.lazy(() => import("@/pages/auth/register/pages"));
 const ResetPasswordPage = React.lazy(
   () => import("@/pages/auth/resetPassword/pages"),
 );
@@ -16,11 +17,9 @@ export const authRoutes: RouteObject[] = [
   {
     path: "/login",
     element: (
-      <LazyLoad>
-        <GuestRoute>
-          <LoginPage />
-        </GuestRoute>
-      </LazyLoad>
+      <GuestRoute>
+        <LoginPage />
+      </GuestRoute>
     ),
   },
 
@@ -30,6 +29,16 @@ export const authRoutes: RouteObject[] = [
       <LazyLoad>
         <GuestRoute>
           <ResetPasswordPage />
+        </GuestRoute>
+      </LazyLoad>
+    ),
+  },
+  {
+    path: "/register",
+    element: (
+      <LazyLoad>
+        <GuestRoute>
+          <RegisterPage />
         </GuestRoute>
       </LazyLoad>
     ),

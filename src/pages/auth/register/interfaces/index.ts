@@ -2,7 +2,9 @@ export interface RegisterRequest {
   phoneNumber: string;
   fullName: string;
   email: string;
-  password: string;
+  province: string;
+  wards: string;
+  address: string;
 }
 
 export interface Role {

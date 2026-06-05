@@ -26,12 +26,17 @@ import {
   Search,
   Trash,
   TrendingUp,
+  FileSpreadsheet,
+  FileText,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DamageCategory, DamageStatus } from "../enum";
 import { useFloodDamages } from "../hooks";
 import type { IFloodDamage } from "../interfaces";
+import { notification } from "antd";
+import { exportToExcel, exportToWord } from "@/utils/exportUtils";
+import { Role } from "@/enums";
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -76,15 +81,31 @@ const formatCurrency = (value: number) => {
 };
 
 export default function ListFloodDamages() {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
   const { styles } = useStyle();
+
+  const HEADER_MAP_FD: Record<string, string> = {
+    reflectionId: "Mã phản ánh",
+    damageCategory: "Loại thiệt hại",
+    description: "Mô tả",
+    estimatedValue: "Giá trị ước tính (VNĐ)",
+    injuredCount: "Số người bị thương",
+    deathCount: "Số người tử vong",
+    createdAt: "Thời gian",
+    status: "Trạng thái",
+  };
+
+  const WORD_WIDTHS_FD: Record<string, number> = {
+    reflectionId: 70, damageCategory: 90, description: 180,
+    estimatedValue: 100, injuredCount: 60, deathCount: 60, createdAt: 80, status: 90,
+  };
 
   const [filters, setFilters] = useState({
     category: undefined as DamageCategory | undefined,
     search: "",
   });
 
-  // Danh sách thiệt hại
   const { data: damages } = useFloodDamages({
     page: 1,
     limit: 10,
@@ -104,6 +125,29 @@ export default function ListFloodDamages() {
         return false;
       return true;
     }) || [];
+
+  const formatFDData = (data: IFloodDamage[]) =>
+    data.map((item) => ({
+      ...item,
+      damageCategory: categoryConfig[item.damageCategory]?.label || item.damageCategory,
+      estimatedValue: formatCurrency(item.estimatedValue),
+      createdAt: new Date(item.createdAt).toLocaleDateString("vi-VN"),
+      status:
+        item.status === DamageStatus.PENDING ? "Chờ kiểm chứng" :
+        item.status === DamageStatus.APPROVED ? "Đã kiểm chứng" : "Đang kiểm chứng",
+    }));
+
+  const handleExportExcelFD = () => {
+    if (!damages?.data?.length) { notification.warning({ message: "Không có dữ liệu để xuất" }); return; }
+    exportToExcel(formatFDData(damages.data), "Danh_Sach_Thiet_Hai", HEADER_MAP_FD);
+    notification.success({ message: "Xuất file Excel thành công" });
+  };
+
+  const handleExportWordFD = () => {
+    if (!damages?.data?.length) { notification.warning({ message: "Không có dữ liệu để xuất" }); return; }
+    exportToWord(formatFDData(damages.data), "Danh_Sach_Thiet_Hai", HEADER_MAP_FD, "DANH SÁCH THIỆT HẠI", WORD_WIDTHS_FD);
+    notification.success({ message: "Xuất file Word thành công" });
+  };
 
   const columns: ColumnType<IFloodDamage>[] = useMemo(() => {
     return [
@@ -315,6 +359,24 @@ export default function ListFloodDamages() {
         <Title level={4} className="mb-0!">
           Danh sách thiệt hại
         </Title>
+        <div className="flex gap-2">
+          {(user?.role?.roleCode === Role.MANAGER || user?.role?.roleCode === Role.ADMIN) && (
+            <>
+              <Button
+                onClick={handleExportExcelFD}
+                className="text-[16px] font-medium h-9! border-green-600 text-green-600 hover:bg-green-50"
+              >
+                <FileSpreadsheet size={16} /> Xuất Excel
+              </Button>
+              <Button
+                onClick={handleExportWordFD}
+                className="text-[16px] font-medium h-9! border-blue-600 text-blue-600 hover:bg-blue-50"
+              >
+                <FileText size={16} /> Xuất Word
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Filters */}

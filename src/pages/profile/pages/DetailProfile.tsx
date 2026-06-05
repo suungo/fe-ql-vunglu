@@ -63,13 +63,15 @@ export default function DetailProfile() {
               <X className="text-slate-700 hover:text-slate-600" size={24} />
             </div>
           </Tooltip>
-          <div className="flex justify-center mb-2 bg-[#FAFAFA]!">
-            <img
-              loading="lazy"
-              alt="Image Auth"
-              className="lg:w-[217px] lg:h-[139px] md:w-[143px] md:h-[90px] w-[101px] rounded-[10px] h-[70px] mix-blend-multiply"
-              src="/image-logo.png"
-            />
+          <div className="relative flex justify-center mb-2 gap-1">
+            <div className="lg:w-[180px] lg:h-[180px] w-[120px] h-[120px] rounded-full overflow-hidden flex items-center justify-center shrink-0 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100/50">
+              <img
+                loading="lazy"
+                alt="Image Auth"
+                className="w-[105%] h-[105%] max-w-[105%] object-cover"
+                src="/image-logo.png"
+              />
+            </div>
           </div>
           <h3 className="lg:text-[30px] text-[24px] mb-2 text-center font-semibold text-[#144c65]">
             Đổi mật khẩu
@@ -118,9 +120,7 @@ export default function DetailProfile() {
               <h2 className="text-2xl font-bold text-slate-800">
                 Thông tin cá nhân
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Quản lý thông tin tài khoản và cài đặt cá nhân
-              </p>
+             
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -145,54 +145,61 @@ export default function DetailProfile() {
 
           <div>
             <ul className="flex flex-col gap-2">
-              <li className="flex items-center justify-between">
-                <span className="text-[16px] text-[#ACACAC]">Họ và tên</span>
+              <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+                 <li className="flex items-center gap-[44px]">
+                <span className="text-[16px] text-[#ACACAC]">Họ và tên:</span>
                 <span className="text-[16px] text-[#000000]">
                   {profileData?.fullName}
                 </span>
               </li>
-              <li className="flex items-center justify-between">
+              <li className="flex items-center gap-4">
                 <span className="text-[16px] text-[#ACACAC]">
-                  Số điện thoại
+                  Số điện thoại:
                 </span>
                 <span className="text-[16px] text-[#000000]">
                   {profileData?.phoneNumber}
                 </span>
               </li>
-              <li className="flex items-center justify-between">
-                <span className="text-[16px] text-[#ACACAC]">Email</span>
+              </div>
+              <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+                 <li className="flex items-center gap-[79px]">
+                <span className="text-[16px] text-[#ACACAC]">Email:</span>
                 <span className="text-[16px] text-[#000000]">
                   {profileData?.email}
                 </span>
               </li>
-              <li className="flex items-center justify-between">
-                <span className="text-[16px] text-[#ACACAC]">Giới tính</span>
+              <li className="flex items-center gap-[58px]">
+                <span className="text-[16px] text-[#ACACAC]">Giới tính:</span>
                 <span className="text-[16px] text-[#000000]">
                   {profileData?.gender === Gender.MALE ? "Nam" : "Nữ"}
                 </span>
               </li>
-              <li className="flex items-center justify-between">
-                <span className="text-[16px] text-[#ACACAC]">Ngày sinh</span>
+              </div>
+              <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+                   <li className="flex items-center gap-[44px]">
+                <span className="text-[16px] text-[#ACACAC]">Ngày sinh:</span>
                 <span className="text-[16px] text-[#000000]">
                   {profileData?.dateBirth
                     ? dayjs(profileData?.dateBirth).format("DD/MM/YYYY")
                     : "Chưa cập nhật"}
                 </span>
               </li>
-              <li className="flex items-center justify-between">
-                <span className="text-[16px] text-[#ACACAC]">Địa chỉ</span>
+              <li className="flex items-center gap-[67px]">
+                <span className="text-[16px] text-[#ACACAC]">Địa chỉ:</span>
                 <span className="text-[16px] text-[#000000]">
                   {profileData?.address || "Chưa cập nhật"}
                 </span>
               </li>
-              <li className="flex items-center justify-between">
-                <span className="text-[16px] text-[#ACACAC]">Vai trò</span>
+              </div>
+              <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+                   <li className="flex items-center gap-[71px]">
+                <span className="text-[16px] text-[#ACACAC]">Vai trò:</span>
                 <span className="text-[16px] text-[#000000]">
                   {getRoleText(profileData?.role?.roleCode)}
                 </span>
               </li>
-              <li className="flex items-center justify-between">
-                <span className="text-[16px] text-[#ACACAC]">Trạng thái</span>
+              <li className="flex items-center gap-[43px]">
+                <span className="text-[16px] text-[#ACACAC]">Trạng thái:</span>
                 <span
                   className={`text-[16px] ${
                     profileData?.status === ProfileStatus.ACTIVE
@@ -205,8 +212,13 @@ export default function DetailProfile() {
                     : "Tạm ngừng hoạt động"}
                 </span>
               </li>
-              <li className="flex items-center justify-between">
-                <span className="text-[16px] text-[#ACACAC]">Ngày tạo</span>
+              </div>
+             
+             
+           
+           
+              <li className="flex items-center gap-[51px]">
+                <span className="text-[16px] text-[#ACACAC]">Ngày tạo:</span>
                 <span className="text-[16px] text-[#000000]">
                   {dayjs(profileData?.createdAt).format("DD/MM/YYYY")}
                 </span>

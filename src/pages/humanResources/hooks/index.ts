@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createHumanResource, deteleHumanResource, getDetailHumanResource, getListHumanResource } from "../api";
+import { createHumanResource, deteleHumanResource, getDetailHumanResource, getListHumanResource, getHRVerificationHistory } from "../api";
 
 
 // 🧠 KEY chuẩn để cache
@@ -28,6 +28,17 @@ export const useHumanResourceDetail = (id?: number) => {
     queryKey: [HUMAN_RESOURCE_KEY, id],
     queryFn: () => getDetailHumanResource(id!),
     enabled: !!id, // chỉ call khi có id
+  });
+};
+
+// =======================
+// 📌 GET VERIFICATION HISTORY
+// =======================
+export const useHRVerificationHistory = (employeeCode?: string) => {
+  return useQuery({
+    queryKey: ['hr-verification-history', employeeCode],
+    queryFn: () => getHRVerificationHistory(employeeCode!),
+    enabled: !!employeeCode,
   });
 };
 

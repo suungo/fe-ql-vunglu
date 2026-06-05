@@ -3,31 +3,43 @@ import type { Category, EventType, Priority, ReflectionStatus } from "../enum";
 export interface Reflection {
   id: number;
 
-  title: string; // Tiêu đề
-  content: string; // Nội dung
-  category: Category; // Danh mục
-  description: string; // Mô tả
-  lat: number; // Vĩ độ
-  lng: number; // Kinh độ
-  address: string; // Địa chỉ
-  imageUrl: string[]; // Ảnh
-  status: ReflectionStatus; // Trạng thái
-  priority: Priority; // Mức độ
-  // Loại sự cố
+  title: string;
+  content: string;
+  category: Category;
+  description: string;
+  lat: number;
+  lng: number;
+  address: string;
+  imageUrl: string[];
+  status: ReflectionStatus;
+  priority: Priority;
   typeOfIncident: EventType;
-  // Thời gian tạo
   createdAt: string;
-  // Thời gian cập nhật
   updatedAt: string;
   response?: string;
   respondedAt?: string;
   user?: {
-      fullName?: string;
-      username?: string;
-      role?: {
-        roleCode?: string;
-      };
+    fullName?: string;
+    username?: string;
+    role?: { roleCode?: string };
   };
+
+  // ── Workflow fields ──────────────────────────────────
+  officerId?: number;
+  inspectorId?: number;
+  patrolId?: number;
+  rejectReason?: string;
+  patrolReport?: string;
+  needReinforcement?: boolean;
+  estimatedHandleMinutes?: number;
+  patrolLat?: number;
+  patrolLng?: number;
+  verifiedAt?: string;
+  dispatchedAt?: string;
+  assignedAt?: string;
+  inspectorAcceptedAt?: string;
+  patrolAcceptedAt?: string;
+  managedBy?: number;
 }
 
 export interface CreateReflection {

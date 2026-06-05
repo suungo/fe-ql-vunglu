@@ -66,12 +66,12 @@ BASE_URL.interceptors.response.use(
 
     // 🎯 chỉ retry khi timeout
     if (error.code === "ECONNABORTED") {
-      if (config.__retryCount < 3) {
+      if (config.__retryCount < 2) {
         config.__retryCount += 1;
         console.log(`🔁 Retry lần ${config.__retryCount}`);
         return BASE_URL.request(config);
       }
-      console.log("❌ Đã retry quá 3 lần");
+      console.log("❌ Đã retry quá 2 lần");
     }
 
     return Promise.reject(error);

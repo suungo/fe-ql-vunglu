@@ -1,21 +1,31 @@
-import { Gender } from "@/enums";
+import { Gender, Role } from "@/enums";
 import useDebounce from "@/hooks/useDebounce"; // giả sử hook này return [debouncedValue]
 import useStyle from "@/interfaces/useStyle";
+import { exportToExcel, exportToWord } from "@/utils/exportUtils";
 import {
   Button,
   Dropdown,
   Empty,
   Input,
   Modal,
-  notification,
   Select,
   Table,
   Tooltip,
+  notification,
 } from "antd";
 import type { ColumnType } from "antd/es/table";
 import { AxiosError } from "axios";
 import dayjs from "dayjs";
-import { EllipsisVertical, Eye, Pencil, Search, Trash, X } from "lucide-react";
+import {
+  EllipsisVertical,
+  Eye,
+  FileSpreadsheet,
+  FileText,
+  Pencil,
+  Search,
+  Trash,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { deteleHumanResource } from "../api";
@@ -25,6 +35,7 @@ import { useHumanResources } from "../hooks";
 import type { HumanResources } from "../interfaces";
 
 export default function HumanResourcesPage() {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isOpenModalAdd, setIsOpenModalAdd] = useState(false);
@@ -110,6 +121,77 @@ export default function HumanResourcesPage() {
     } finally {
       setIsLoadingDelete(false);
     }
+  };
+
+  const HEADER_MAP_HR: Record<string, string> = {
+    employeeCode: "Mã nhân sự",
+    fullName: "Họ và tên",
+    email: "Email",
+    phoneNumber: "Số điện thoại",
+    address: "Địa chỉ",
+    dateBirth: "Ngày sinh",
+    position: "Chức vụ",
+    gender: "Giới tính",
+    status: "Trạng thái",
+  };
+
+  const WORD_WIDTHS_HR: Record<string, number> = {
+    employeeCode: 70,
+    fullName: 120,
+    email: 140,
+    phoneNumber: 90,
+    address: 150,
+    dateBirth: 75,
+    position: 130,
+    gender: 55,
+    status: 80,
+  };
+
+  const formatHRData = (data: HumanResources[]) =>
+    data.map((item) => ({
+      ...item,
+      gender: item.gender === "MALE" ? "Nam" : "Nữ",
+      dateBirth: item.dateBirth
+        ? new Date(item.dateBirth).toLocaleDateString("vi-VN")
+        : "",
+      position:
+        item.position === HumanResourcesPosition.OFFICER
+          ? "Cán bộ tăng cường"
+          : item.position === HumanResourcesPosition.STAFF
+            ? "Nhân viên y tế"
+            : "Cư dân",
+      status:
+        item.status === HumanResourcesStatus.ACTIVE
+          ? "Đang làm việc"
+          : item.status === HumanResourcesStatus.INACTIVE
+            ? "Dừng làm việc"
+            : "Chưa làm việc",
+    }));
+
+  const handleExportExcelHR = () => {
+    const raw = ListHumanResources?.data || [];
+    if (!raw.length) {
+      notification.warning({ message: "Không có dữ liệu để xuất" });
+      return;
+    }
+    exportToExcel(formatHRData(raw), "Danh_Sach_Nhan_Su", HEADER_MAP_HR);
+    notification.success({ message: "Xuất file Excel thành công" });
+  };
+
+  const handleExportWordHR = () => {
+    const raw = ListHumanResources?.data || [];
+    if (!raw.length) {
+      notification.warning({ message: "Không có dữ liệu để xuất" });
+      return;
+    }
+    exportToWord(
+      formatHRData(raw),
+      "Danh_Sach_Nhan_Su",
+      HEADER_MAP_HR,
+      "DANH SÁCH NHÂN SỰ",
+      WORD_WIDTHS_HR,
+    );
+    notification.success({ message: "Xuất file Word thành công" });
   };
 
   const columns: ColumnType<HumanResources>[] = useMemo(() => {
@@ -214,12 +296,16 @@ export default function HumanResourcesPage() {
         render: (text: string) => (
           <span className="text-[#000000] lg:text-[16px] text-[14px]">
             {text === HumanResourcesPosition.OFFICER
-              ? "Cán bộ phường (công an cấp xã)"
-              : text === HumanResourcesPosition.LEADER
-                ? "Tình nguyện viên"
-                : text === HumanResourcesPosition.STAFF
-                  ? "Nhân viên y tế"
-                  : "Cư dân"}
+              ? "Cán bộ tăng cường"
+              : text === HumanResourcesPosition.STAFF
+                ? "Nhân viên y tế"
+                : text === HumanResourcesPosition.POSTOFFICER
+                  ? "Cán bộ hậu kiểm"
+                  : text === HumanResourcesPosition.ELECTRICITYSTAFF
+                    ? "Nhân viên điện lực"
+                    : text === HumanResourcesPosition.PATROL
+                      ? "Cán bộ tuần tra"
+                      : text || "Chưa có dữ liệu"}
           </span>
         ),
       },
@@ -425,16 +511,34 @@ export default function HumanResourcesPage() {
             <div className="2xl:text-[26px] xl:text-[22px] text-[18px] font-semibold text-[#272727]">
               Danh sách nhân sự
             </div>
-            <Button
-              onClick={() => {
-                setIsOpenModalAdd(true);
-                setStatus("add");
-              }}
-              type="primary"
-              className="text-[16px] font-medium h-9!"
-            >
-              + Thêm nhân sự
-            </Button>
+            <div className="flex gap-2">
+              {(user?.role?.roleCode === Role.MANAGER || user?.role?.roleCode === Role.ADMIN) && (
+                <>
+                  <Button
+                    onClick={handleExportExcelHR}
+                    className="text-[16px] font-medium h-9! border-green-600 text-green-600 hover:bg-green-50"
+                  >
+                    <FileSpreadsheet size={16} /> Xuất Excel
+                  </Button>
+                  <Button
+                    onClick={handleExportWordHR}
+                    className="text-[16px] font-medium h-9! border-blue-600 text-blue-600 hover:bg-blue-50"
+                  >
+                    <FileText size={16} /> Xuất Word
+                  </Button>
+                </>
+              )}
+              <Button
+                onClick={() => {
+                  setIsOpenModalAdd(true);
+                  setStatus("add");
+                }}
+                type="primary"
+                className="text-[16px] font-medium h-9!"
+              >
+                + Thêm nhân sự
+              </Button>
+            </div>
           </div>
 
           <div className="flex justify-between mb-4">

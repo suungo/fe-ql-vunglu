@@ -146,3 +146,9 @@ select,
 .ant-input-password {
   font-size: 16px !important;
 }
+
+
+/* Ẩn thông tin bản quyền của leaflet */
+.leaflet-control-attribution {
+  display: none !important;
+}

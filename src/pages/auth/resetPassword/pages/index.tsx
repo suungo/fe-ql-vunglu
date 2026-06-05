@@ -100,8 +100,13 @@ export default function ResetPasswordPage() {
       }
     } catch (error: unknown) {
       const messageError =
-        (error as { response?: { data?: { message?: string; error?: string } } })?.response?.data?.message ||
-        (error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        (
+          error as {
+            response?: { data?: { message?: string; error?: string } };
+          }
+        )?.response?.data?.message ||
+        (error as { response?: { data?: { error?: string } } })?.response?.data
+          ?.error ||
         "Lỗi từ server";
       notification.error({
         title: "Thất bại",
@@ -118,13 +123,15 @@ export default function ResetPasswordPage() {
     <main className="h-screen w-full bg-[url('/image-auth.png')] bg-no-repeat  bg-left bg-cover flex items-center justify-center">
       <div className="z-50 bg-white rounded-[20px] lg:min-w-[655px] md:w-[495px] min-w-[335px] py-5 px-5">
         <div className="flex items-center mb-6 flex-col">
-          <div className="flex justify-center mb-2">
-            <img
-              loading="lazy"
-              alt="Logo Shipup"
-              className="lg:w-[217px] lg:h-[139px] md:w-[143px] md:h-[90px] w-[101px] h-[70px] rounded-[10px]"
-              src="/image-logo.png"
-            />
+          <div className="relative flex justify-center mb-2 gap-1">
+            <div className="lg:w-[180px] lg:h-[180px] w-[120px] h-[120px] rounded-full overflow-hidden flex items-center justify-center shrink-0 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100/50">
+              <img
+                loading="lazy"
+                alt="Image Auth"
+                className="w-[105%] h-[105%] max-w-[105%] object-cover"
+                src="/image-logo.png"
+              />
+            </div>
           </div>
           <h3 className="lg:text-[30px] text-[24px] mb-2 text-center font-semibold text-[#144C65]">
             {isResetPassword ? "Quên mật khẩu" : "Tạo mật khẩu mới"}

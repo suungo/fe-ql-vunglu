@@ -1,8 +1,9 @@
-import { Button, Form, Input, notification, Select, Spin } from "antd";
+import { Button, Form, Input, Modal, notification, Select, Spin } from "antd";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { LocateFixed } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useVerificationSocket } from "@/hooks/useVerificationSocket";
 import {
   MapContainer,
   Marker,
@@ -72,6 +73,8 @@ export default function FormanagerResidents({
     address?: string;
   } | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
+  const [isSelectAccountModalOpen, setIsSelectAccountModalOpen] = useState(false);
+  const [pendingValues, setPendingValues] = useState<CreateResident | null>(null);
 
   const { data: dataEdit, isLoading } = useResidentById(effectiveId as number);
 
@@ -99,8 +102,13 @@ export default function FormanagerResidents({
       );
       const data = await res.json();
       if (data?.display_name) {
+        // Làm sạch địa chỉ: bỏ mã bưu chính 5-6 số và chữ "Việt Nam"
+        const addrName = data.display_name
+          .replace(/,\s*\d{5,6}\b/gi, "")
+          .replace(/,\s*Việt\s*Nam\s*$/gi, "")
+          .replace(/,\s*Vietnam\s*$/gi, "")
+          .trim();
         // Cập nhật cả form và state 'address' để input hiển thị đúng
-        const addrName = data.display_name;
         form.setFieldsValue({ address: addrName });
         setAddress(addrName);
         setLocation({ lat, lng, address: addrName });
@@ -206,26 +214,28 @@ export default function FormanagerResidents({
 
   const createResidentMutation = useCreateResident();
   const updateResidentMutation = useUpdateResident();
+  const { emitNewResidentRegistration } = useVerificationSocket();
 
-  const onFinish = async (values: CreateResident) => {
+  const submitWithAccountOption = async (createAccount: boolean) => {
+    if (!pendingValues) return;
     setLoading(true);
+    setIsSelectAccountModalOpen(false);
     try {
-      if (mode === "add") {
-        const data = {
-          ...values,
-          address: address,
-        };
-        await createResidentMutation.mutateAsync(data);
-      } else {
-        const data = {
-          ...values,
-          address: address,
-        };
-        await updateResidentMutation.mutateAsync({
-          id: effectiveId!,
-          value: data,
-        });
-      }
+      const data = {
+        ...pendingValues,
+        address: address,
+        createAccount,
+      };
+
+      // Nghiệp vụ mới: Không tạo ngay vào DB DA-TTTN.
+      // Gửi toàn bộ data sang hệ thống xác thực (verification-resident)
+      emitNewResidentRegistration(data);
+
+      notification.success({
+        message: "Đã gửi yêu cầu đăng ký",
+        description: "Thông tin cư dân đã được gửi sang hệ thống xác thực để chờ duyệt.",
+      });
+
       if (onCancel) onCancel();
       if (refetch) refetch();
       if (!onCancel && !refetch) {
@@ -234,12 +244,52 @@ export default function FormanagerResidents({
     } catch (error: unknown) {
       const errorResponse = (error as any)?.response?.data;
       notification.error({
-        title: "Thất bại",
+        message: "Thất bại",
         description: errorResponse?.message || "Có lỗi xảy ra",
       });
       if (onCancel) onCancel();
     } finally {
       setLoading(false);
+      setPendingValues(null);
+    }
+  };
+
+  const onFinish = async (values: CreateResident) => {
+    try {
+      if (mode === "add") {
+        setPendingValues(values);
+        setIsSelectAccountModalOpen(true);
+      } else {
+        setLoading(true);
+        const data = {
+          ...values,
+          address: address,
+        };
+        await updateResidentMutation.mutateAsync({
+          id: effectiveId!,
+          value: data,
+        });
+        notification.success({
+          message: "Thành công",
+          description: "Đã cập nhật thông tin hộ dân.",
+        });
+        if (onCancel) onCancel();
+        if (refetch) refetch();
+        if (!onCancel && !refetch) {
+          navigate("/app/residents-manager/list");
+        }
+      }
+    } catch (error: unknown) {
+      const errorResponse = (error as any)?.response?.data;
+      notification.error({
+        message: "Thất bại",
+        description: errorResponse?.message || "Có lỗi xảy ra",
+      });
+      if (onCancel) onCancel();
+    } finally {
+      if (mode !== "add") {
+        setLoading(false);
+      }
     }
   };
   return (
@@ -711,6 +761,61 @@ export default function FormanagerResidents({
           </Form>
         </div>
       )}
+
+      <Modal
+        title={
+          <div className="text-center font-bold text-lg text-slate-800 border-b pb-3 mb-4">
+            LỰA CHỌN PHƯƠNG THỨC TẠO HỘ DÂN
+          </div>
+        }
+        open={isSelectAccountModalOpen}
+        onCancel={() => {
+          setIsSelectAccountModalOpen(false);
+        }}
+        footer={null}
+        width={500}
+        centered
+        className="rounded-2xl overflow-hidden"
+      >
+        <div className="py-4 text-center">
+          <p className="text-slate-600 text-sm mb-6 leading-relaxed">
+            Hệ thống chuẩn bị gửi yêu cầu đăng ký cư dân. Vui lòng xác nhận bạn có muốn tạo tài khoản đăng nhập trên ứng dụng di động cho chủ hộ dân này hay không?
+          </p>
+          
+          <div className="grid grid-cols-1 gap-4">
+            <Button
+              type="primary"
+              size="large"
+              className="h-16 font-semibold text-base flex flex-col justify-center items-center rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-0 shadow-md transition-all duration-300"
+              onClick={() => submitWithAccountOption(true)}
+            >
+              <span className="font-bold">Tạo tài khoản đăng nhập</span>
+              <span className="text-[11px] font-normal opacity-85 mt-0.5">Chủ hộ có thể đăng nhập app di động để phản ánh trực tiếp</span>
+            </Button>
+            
+            <Button
+              size="large"
+              className="h-16 font-semibold text-base flex flex-col justify-center items-center rounded-xl border-2 border-slate-200 hover:border-indigo-500 hover:text-indigo-600 transition-all duration-300"
+              onClick={() => submitWithAccountOption(false)}
+            >
+              <span className="font-bold text-slate-700">Không tạo tài khoản</span>
+              <span className="text-[11px] font-normal text-slate-400 mt-0.5">Chỉ quản lý thông tin hộ dân nội bộ</span>
+            </Button>
+            
+            <Button
+              type="text"
+              danger
+              size="large"
+              className="h-10 mt-2 font-medium text-slate-500 hover:text-red-500"
+              onClick={() => {
+                setIsSelectAccountModalOpen(false);
+              }}
+            >
+              Hủy bỏ thao tác
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

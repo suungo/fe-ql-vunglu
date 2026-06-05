@@ -6,6 +6,7 @@ import LazyLoad from "@/components/base/lazyLoad";
 import { accountRoutes } from "./account.routes";
 import { authRoutes } from "./auth.routes";
 import { dashboardRoutes } from "./dashboard.routes";
+import { dispatchRoutes } from "./dispatch.routes";
 import { floodDamagesRoutes } from "./floodDamages.routes";
 import { humanResourceRoutes } from "./humanResource.routes";
 import { profileRoutes } from "./profile.routes";
@@ -43,6 +44,7 @@ const routers = createBrowserRouter([
       ...floodDamagesRoutes,
       ...reflectionRoutes,
       ...verificationRoutes,
+      ...dispatchRoutes,
       ...accountRoutes,
     ],
   },

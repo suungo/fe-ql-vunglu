@@ -1,13 +1,15 @@
 import { formRules } from "@/components/constants";
 import { Gender } from "@/enums";
+import { useHRVerificationSocket } from "@/hooks/useHRVerificationSocket";
 import { Button, DatePicker, Form, Input, notification, Select } from "antd";
 import { HttpStatusCode } from "axios";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
-import { createHumanResource, updateHumanResource } from "../api";
-import { HumanResourcesPosition, HumanResourcesStatus } from "../enum";
+import { updateHumanResource, getListHumanResource, getHRVerificationHistory } from "../api";
+import { SelectGender, SelectHumanResourcesPosition, SelectHumanResourcesStatus } from "../constants";
 import { useHumanResourceDetail } from "../hooks";
 import type { CreateHumanResources, UpdateHumanResources } from "../interfaces";
+import { HumanResourcesPosition } from "../enum";
 
 type Props = {
   onCancel: () => void;
@@ -26,6 +28,7 @@ export default function FormManagerHumanResources({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const { data: detailData, isLoading: isLoadingHumanResource } =
     useHumanResourceDetail(Number(id));
+  const { emitNewHRRegistration } = useHRVerificationSocket();
 
   useEffect(() => {
     if (detailData?.data) {
@@ -55,31 +58,86 @@ export default function FormManagerHumanResources({
   ) => {
     setIsLoading(true);
     try {
+      if (mode === "add") {
+        // A. Kiểm tra trong hệ thống chính DA-TTTN
+        const activeCheck = await getListHumanResource(values.employeeCode, 1, 1);
+        const codeExistsInActive = activeCheck?.data?.some(
+          (hr) => hr.employeeCode.trim().toLowerCase() === values.employeeCode.trim().toLowerCase()
+        );
+
+        if (codeExistsInActive) {
+          notification.error({
+            message: "Trùng mã nhân sự",
+            title: "Trùng mã nhân sự",
+            description: `Mã nhân sự "${values.employeeCode}" đã tồn tại và đang hoạt động trên hệ thống.`,
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        // B. Kiểm tra trong hệ thống xác thực (đang chờ duyệt hoặc đã duyệt)
+        try {
+          const verifyCheck = await getHRVerificationHistory(values.employeeCode);
+          const hasPendingOrApproved = verifyCheck?.data?.some(
+            (item) => item.status === "PENDING" || item.status === "APPROVED"
+          );
+
+          if (hasPendingOrApproved) {
+            notification.error({
+              message: "Yêu cầu đã tồn tại",
+              title: "Yêu cầu đã tồn tại",
+              description: `Mã nhân sự "${values.employeeCode}" đã có hồ sơ đang chờ duyệt hoặc đã xác thực trên hệ thống xác minh.`,
+            });
+            setIsLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn("Skip verification history check error", e);
+        }
+      }
+
+      const creator = JSON.parse(localStorage.getItem("user") || "null");
       const payload = {
         ...values,
         dateBirth: values.dateBirth
           ? dayjs(values.dateBirth).toISOString()
           : undefined,
+        creator: creator ? {
+          id: creator.id,
+          fullName: creator.fullName,
+          phoneNumber: creator.phoneNumber,
+          email: creator.email,
+          employeeCode: creator.employeeCode,
+          position: creator.role?.roleName || creator.role?.roleCode || "Quản lý",
+        } : null,
       };
-
-      const response =
-        mode === "edit" && id
-          ? await updateHumanResource(payload as UpdateHumanResources, id)
-          : await createHumanResource(payload as CreateHumanResources);
-      if (
-        response?.statusCode === 201 ||
-        response?.statusCode === HttpStatusCode.Ok
-      ) {
+ 
+      if (mode === "edit" && id) {
+        const response = await updateHumanResource(
+          payload as UpdateHumanResources,
+          id,
+        );
+        if (
+          response?.statusCode === 201 ||
+          response?.statusCode === HttpStatusCode.Ok
+        ) {
+          notification.success({
+            title: "Thành Công",
+            description: response?.message || "Cập nhật nhân sự thành công",
+          });
+          onCancel();
+          refetch();
+        }
+      } else {
+        // Thay vì gọi createHumanResource, gửi data tới hệ thống duyệt
+        emitNewHRRegistration(payload);
         notification.success({
-          title: "Thành Công",
+          title: "Đã gửi yêu cầu",
           description:
-            response?.message ||
-            (mode === "edit"
-              ? "Cập nhật nhân sự thành công"
-              : "Thêm nhân sự thành công"),
+            "Yêu cầu đăng ký nhân sự đã được gửi đến hệ thống quản lý để chờ duyệt.",
         });
         onCancel();
-        refetch();
+        form.resetFields();
       }
     } catch (error: unknown) {
       const errorMsg =
@@ -198,20 +256,7 @@ export default function FormManagerHumanResources({
           >
             <Select
               className="w-full h-10!"
-              options={[
-                {
-                  label: "Cán bộ (Công an xã)",
-                  value: HumanResourcesPosition.OFFICER,
-                },
-                {
-                  label: "Tình nguyện viên",
-                  value: HumanResourcesPosition.LEADER,
-                },
-                {
-                  label: "Nhân viên y tế",
-                  value: HumanResourcesPosition.STAFF,
-                },
-              ]}
+              options={SelectHumanResourcesPosition}
               placeholder="Nhập chức vụ"
             />
           </Form.Item>
@@ -231,10 +276,7 @@ export default function FormManagerHumanResources({
           >
             <Select
               className="w-full h-10!"
-              options={Object.values(Gender).map((status) => ({
-                label: status === Gender.MALE ? "Nam" : "Nữ",
-                value: status,
-              }))}
+              options={SelectGender}
               placeholder="Nhập giới tính"
             />
           </Form.Item>
@@ -252,20 +294,7 @@ export default function FormManagerHumanResources({
           >
             <Select
               className="w-full h-10!"
-              options={[
-                {
-                  label: "Đang làm việc",
-                  value: HumanResourcesStatus.ACTIVE,
-                },
-                {
-                  label: "Chưa làm việc",
-                  value: HumanResourcesStatus.PENDING,
-                },
-                {
-                  label: "Dừng làm việc",
-                  value: HumanResourcesStatus.INACTIVE,
-                },
-              ]}
+              options={SelectHumanResourcesStatus}
               placeholder="Nhập trạng thái"
             />
           </Form.Item>

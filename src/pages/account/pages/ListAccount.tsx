@@ -1,34 +1,34 @@
 import { Role } from "@/enums";
 import useDebounce from "@/hooks/useDebounce";
 import {
-    Button,
-    Dropdown,
-    Empty,
-    Input,
-    Modal,
-    notification,
-    Spin,
-    Table,
-    Tag,
-    Tooltip,
+  Button,
+  Dropdown,
+  Empty,
+  Input,
+  Modal,
+  notification,
+  Spin,
+  Table,
+  Tag,
+  Tooltip,
 } from "antd";
 import type { ColumnType } from "antd/es/table";
 import { AxiosError } from "axios";
 import {
-    EllipsisVertical,
-    Eye,
-    RefreshCw,
-    Search,
-    Trash,
-    UserPlus,
-    X,
+  EllipsisVertical,
+  Eye,
+  RefreshCw,
+  Search,
+  Trash,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useDeleteUser, useUsers } from "../hooks";
 import type { User } from "../interfaces";
 
-export default function ListRegister() {
+export default function ListAccount() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 

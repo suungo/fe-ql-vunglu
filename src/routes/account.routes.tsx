@@ -2,16 +2,14 @@ import LazyLoad from "@/components/base/lazyLoad";
 import React from "react";
 import { Navigate, type RouteObject } from "react-router-dom";
 
-const AccountPage = React.lazy(
-  () => import("@/pages/auth/register/pages/index"),
-);
+const AccountPage = React.lazy(() => import("@/pages/account/pages/index"));
 
 const ListAccount = React.lazy(
-  () => import("@/pages/auth/register/pages/ListRegister"),
+  () => import("@/pages/account/pages/ListAccount"),
 );
 
 const FormAccount = React.lazy(
-  () => import("@/pages/auth/register/components/FormRegister"),
+  () => import("@/pages/account/components/FormAccount"),
 );
 
 export const accountRoutes: RouteObject[] = [

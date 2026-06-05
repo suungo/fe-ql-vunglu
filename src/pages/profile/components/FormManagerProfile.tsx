@@ -1,6 +1,6 @@
 import { formRules } from "@/components/constants";
 import { Gender } from "@/enums";
-import { Button, DatePicker, Form, Input, message, Select } from "antd";
+import { Button, DatePicker, Form, Input, message, notification, Select } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { useEffect, useState } from "react";
@@ -48,15 +48,17 @@ export default function FormManagerUpdateProfile({
       };
       const response = await updateProfileApi(DataUpdate);
       if (response?.statusCode === 200) {
-        message.success("Cập nhật thông tin thành công");
+        notification.success({title:"Thành công",description: "Cập nhật thông tin thành công"});
         onSuccess();
         onCancel();
+        localStorage.setItem("user", JSON.stringify(response?.data));
+
       } else {
-        message.error(response.message);
+        notification.error({title: "Thất bại",description: response.message});
       }
     } catch (error: unknown) {
       const err = error as { message?: string } | undefined;
-      message.error(err?.message || "Có lỗi xảy ra");
+      notification.error({title: "Thất bại",description: err?.message || "Có lỗi xảy ra"});
     } finally {
       setIsLoading(false);
     }
@@ -66,11 +68,11 @@ export default function FormManagerUpdateProfile({
       layout="vertical"
       initialValues={{ remember: true }}
       onFinish={handleUpdateProfile}
-      requiredMark="optional"
       form={form}
     >
       <div className="grid grid-cols-2 gap-4">
         <Form.Item<FormValues>
+          required={false}
           rules={formRules.fullName()}
           name="fullName"
           label={
@@ -84,6 +86,7 @@ export default function FormManagerUpdateProfile({
           <Input className="w-full h-10!" placeholder="Nhập họ và tên" />
         </Form.Item>
         <Form.Item<FormValues>
+          required={false}
           rules={formRules.email()}
           name="email"
           label={
@@ -99,6 +102,7 @@ export default function FormManagerUpdateProfile({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Form.Item<FormValues>
+          required={false}
           rules={formRules.phone()}
           name="phoneNumber"
           label={
@@ -112,6 +116,7 @@ export default function FormManagerUpdateProfile({
           <Input className="w-full h-10!" placeholder="Nhập số điện thoại" />
         </Form.Item>
         <Form.Item<FormValues>
+          required={false}
           rules={[{ required: true, message: "Vui lòng nhập ngày sinh" }]}
           name="dateBirth"
           label={
@@ -131,6 +136,7 @@ export default function FormManagerUpdateProfile({
       </div>
       <div className="">
         <Form.Item<FormValues>
+          required={false}
           rules={formRules.address()}
           name="address"
           label={
@@ -146,6 +152,7 @@ export default function FormManagerUpdateProfile({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Form.Item<FormValues>
+          required={false}
           rules={[{ required: true, message: "Vui lòng nhập giới tính" }]}
           name="gender"
           label={
@@ -173,6 +180,7 @@ export default function FormManagerUpdateProfile({
           />
         </Form.Item>
         <Form.Item<FormValues>
+          required={false}
           rules={[{ required: true, message: "Vui lòng nhập trạng thái" }]}
           name="status"
           label={

@@ -87,3 +87,80 @@ export const uploadApi = async (file: File) => {
   });
   return response.data;
 };
+
+// ══════════════════════════════════════════════════════════════════════
+// WORKFLOW ENDPOINTS
+// ══════════════════════════════════════════════════════════════════════
+
+/** [OFFICER] Bước 3: Xác minh thực địa phản ánh */
+export const verifyReflectionApi = async (
+  id: number,
+  data: { confirmed: boolean; rejectReason?: string; note?: string }
+) => {
+  const response = await BASE_URL.patch(`/${REPORT}/${id}/verify`, data, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+/** [MANAGER/ADMIN] Bước 4: Giao phản ánh cho Hậu kiểm */
+export const assignReflectionApi = async (
+  id: number,
+  data: { inspectorId: number; note?: string }
+) => {
+  const response = await BASE_URL.patch(`/${REPORT}/${id}/assign`, data, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+/** [INSPECTOR/MANAGER] Bước 5: Điều cán bộ tuần tra xử lý */
+export const dispatchPatrolApi = async (
+  id: number,
+  data: { patrolId: number; estimatedHandleMinutes?: number; note?: string }
+) => {
+  const response = await BASE_URL.patch(`/${REPORT}/${id}/dispatch`, data, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+/** [INSPECTOR] Nhận việc được phân công */
+export const acceptByInspectorApi = async (id: number) => {
+  const response = await BASE_URL.patch(`/${REPORT}/${id}/accept-inspector`, {}, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+/** [PATROL] Nhận việc được điều động */
+export const acceptByPatrolApi = async (id: number) => {
+  const response = await BASE_URL.patch(`/${REPORT}/${id}/accept-patrol`, {}, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+/** [PATROL] Bước 8: Nộp báo cáo kết quả thực địa */
+export const submitPatrolReportApi = async (
+  id: number,
+  data: {
+    resolved: boolean;
+    patrolReport: string;
+    needReinforcement?: boolean;
+    incompleteReason?: string;
+  }
+) => {
+  const response = await BASE_URL.patch(`/${REPORT}/${id}/patrol-report`, data, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+/** [INSPECTOR/MANAGER] Bước 9: Xác nhận hoàn thành và gửi báo cáo */
+export const inspectorConfirmApi = async (id: number, data: { note?: string }) => {
+  const response = await BASE_URL.patch(`/${REPORT}/${id}/inspector-confirm`, data, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};

@@ -279,7 +279,7 @@ export default function Dashboard() {
 
       {/* Hướng dẫn */}
       <div className="text-xs text-slate-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 flex items-center gap-2">
-        <span>📍</span>
+  
         <span>
           Bản đồ hiển thị <strong>Các sự kiện đang xử lý và đã hoàn tất</strong>
           . Màu sắc thể hiện mức độ ưu tiên của sự cố.
@@ -291,7 +291,8 @@ export default function Dashboard() {
         <MapContainer
           center={mapCenter}
           zoom={14}
-          className="h-[350px] md:h-[500px] w-full"
+          maxZoom={20}
+          className="h-[350px] md:h-[700px] w-full"
           scrollWheelZoom={true}
         >
           <LayersControl position="topright">
@@ -300,17 +301,17 @@ export default function Dashboard() {
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
                 url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                maxZoom={18}
+                maxZoom={20}
                 subdomains="abcd"
               />
             </LayersControl.BaseLayer>
 
-            {/* Base: Google Satellite */}
-            <LayersControl.BaseLayer name="Google Satellite">
+            {/* Base: Google Hybrid */}
+            <LayersControl.BaseLayer name="Google Hybrid (Vệ tinh & Đường)">
               <TileLayer
-                attribution="Google Satellite"
-                url="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                maxZoom={18}
+                attribution="Google Hybrid"
+                url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+                maxZoom={20}
               />
             </LayersControl.BaseLayer>
 
@@ -319,11 +320,13 @@ export default function Dashboard() {
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                maxZoom={20}
+                maxNativeZoom={19}
               />
             </LayersControl.BaseLayer>
 
             {/* Overlay: GeoServer WMS */}
-            <LayersControl.Overlay checked name="🗺️ Bản đồ Tâm Bình (WMS)">
+            <LayersControl.Overlay checked name="🗺️ Bản đồ chi tiết Tâm Bình (WMS)">
               <WMSTileLayer
                 url={GEOSERVER_URL}
                 layers={GEOSERVER_LAYER}
@@ -332,16 +335,45 @@ export default function Dashboard() {
                 version="1.1.0"
                 attribution="&copy; GeoServer | Tâm Bình"
                 opacity={0.75}
+                maxZoom={20}
+              />
+            </LayersControl.Overlay>
+
+            {/* Overlay: Giao thông Tâm Bình */}
+            <LayersControl.Overlay name="🚦 Giao thông Tâm Bình">
+              <WMSTileLayer
+                url={GEOSERVER_URL}
+                layers="tambinh:giaothongTamBinh1"
+                format="image/png"
+                transparent={true}
+                version="1.1.0"
+                attribution="&copy; GeoServer | Giao thông"
+                opacity={0.8}
+                maxZoom={20}
+              />
+            </LayersControl.Overlay>
+
+            {/* Overlay: Ranh khu phố Tâm Bình */}
+            <LayersControl.Overlay name="🏘️ Ranh khu phố Tâm Bình">
+              <WMSTileLayer
+                url={GEOSERVER_URL}
+                layers="tambinh:ranhkhupho2"
+                format="image/png"
+                transparent={true}
+                version="1.1.0"
+                attribution="&copy; GeoServer | Ranh khu phố"
+                opacity={0.8}
+                maxZoom={20}
               />
             </LayersControl.Overlay>
           </LayersControl>
 
           {/* WMS Click Handler — lấy thông tin đơn vị hành chính khi click */}
-          <WmsClickHandler
+          {/* <WmsClickHandler
             wmsUrl={GEOSERVER_URL}
             displayLayer={GEOSERVER_LAYER}
             queryLayer={GEOSERVER_QUERY_LAYER}
-          />
+          /> */}
 
           {/* Markers */}
           {resolvedReflections.map(            (r) =>

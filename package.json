@@ -27,7 +27,8 @@
     "socket.io-client": "^4.8.3",
     "tailwindcss": "^4.1.18",
     "uui": "^1.0.7",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

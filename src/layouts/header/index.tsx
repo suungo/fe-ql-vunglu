@@ -5,25 +5,32 @@ import { clearDeviceId, getDeviceId } from "@/utils/device";
 import {
   Button,
   List,
-  message,
   Modal,
   Popover,
   Tooltip,
+  message,
+  notification as antdNotification,
   type MenuProps,
 } from "antd";
 import Dropdown from "antd/es/dropdown/dropdown";
 import {
+  AlertTriangle,
+  Bell,
+  CheckCircle2,
   Eye,
   Info,
   LockKeyhole,
   Menu as MenuIcon,
+  MessageSquare,
   Power,
   UserRound,
   X,
+  XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { io, Socket } from "socket.io-client";
+import { Socket, io } from "socket.io-client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Notification {
   id: string;
@@ -60,6 +67,7 @@ type HeaderProps = {
 
 export default function Header({ onMenuToggle }: HeaderProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [now, setNow] = useState(() => new Date());
   // const [isConnected, setIsConnected] = useState(false);
   const [alertsCount, setAlertsCount] = useState<number | null>(null);
@@ -67,9 +75,17 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   const [isOpenModalLogout, setIsOpenModalLogout] = useState(false);
   const [selectedNotification, setSelectedNotification] =
     useState<Notification | null>(null);
+  const [isLoadingLogout, setIsLoadingLogout] = useState(false);
   const [isOpenModalChangePassword, setIsOpenModalChangePassword] =
     useState(false);
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const user = (() => {
+    try {
+      const u = localStorage.getItem("user");
+      return u && u !== "undefined" ? JSON.parse(u) : {};
+    } catch {
+      return {};
+    }
+  })();
   useEffect(() => {
     const t = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(t);
@@ -122,6 +138,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     VERIFICATION_APPROVED: "Yêu cầu xác minh đã được duyệt",
     VERIFICATION_REJECTED: "Yêu cầu xác minh đã bị từ chối",
     VERIFICATION_COMPLETED: "Yêu cầu xác minh đã hoàn thành",
+    EMERGENCY_CHAT: "Hỗ trợ khẩn cấp",
   };
   const handleNotificationClick = async (item: Notification) => {
     // 1. Mark as read
@@ -146,7 +163,12 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     }
 
     // 2. Navigate
-    if (item.type === "NEW_REFLECTION" || item.type === "NEARBY_REFLECTION") {
+    if (item.type === "EMERGENCY_CHAT") {
+      navigate(`/messages-realtime`);
+    } else if (
+      item.type === "NEW_REFLECTION" ||
+      item.type === "NEARBY_REFLECTION"
+    ) {
       if (item.referenceId) {
         navigate(`/app/reflection-manager/detail/${item.referenceId}`);
       } else {
@@ -284,16 +306,124 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         setNotifications((prev) => [notification, ...prev]);
         setAlertsCount((prev) => (prev || 0) + 1);
 
-        // Hiển thị thông báo nhỏ ở góc màn hình (optional)
-        message.info({
-          content: (
-            <div onClick={() => setSelectedNotification(notification)}>
-              <p className="font-bold mb-0">{notification.title}</p>
-              <p className="text-xs">{notification.content}</p>
+        // Tự động làm mới danh sách nhân sự khi nhận thông báo liên quan
+        if (
+          notification.type === "VERIFICATION_APPROVED" ||
+          notification.type === "VERIFICATION_COMPLETED" ||
+          notification.type === "VERIFICATION_REJECTED" ||
+          notification.title?.toLowerCase().includes("nhân sự") ||
+          notification.content?.toLowerCase().includes("nhân sự")
+        ) {
+          queryClient.invalidateQueries({ queryKey: ["human-resources"] });
+          queryClient.invalidateQueries({ queryKey: ["hr-verification-history"] });
+        }
+
+        // Phân loại thông báo để hiển thị style đẹp mắt, chuyên nghiệp hơn
+        let iconElement = <Bell className="text-blue-500" size={20} />;
+        let borderLeftColor = '#1a5d9f'; // Màu xanh thương hiệu mặc định
+        let badgeText = 'Hệ thống';
+        let badgeBg = '#f0f7ff';
+        let badgeTextColor = '#0369a1';
+
+        switch (notification.type) {
+          case 'VERIFICATION_APPROVED':
+          case 'VERIFICATION_COMPLETED':
+            iconElement = <CheckCircle2 className="text-emerald-500" size={20} />;
+            borderLeftColor = '#10b981'; // Emerald 500
+            badgeText = 'Đã duyệt';
+            badgeBg = '#ecfdf5';
+            badgeTextColor = '#047857';
+            break;
+          case 'VERIFICATION_REJECTED':
+            iconElement = <XCircle className="text-rose-500" size={20} />;
+            borderLeftColor = '#f43f5e'; // Rose 500
+            badgeText = 'Từ chối';
+            badgeBg = '#fff1f2';
+            badgeTextColor = '#be123c';
+            break;
+          case 'NEW_REFLECTION':
+          case 'NEARBY_REFLECTION':
+            iconElement = <AlertTriangle className="text-amber-500" size={20} />;
+            borderLeftColor = '#f59e0b'; // Amber 500
+            badgeText = 'Phản ánh mới';
+            badgeBg = '#fffbeb';
+            badgeTextColor = '#b45309';
+            break;
+          case 'EMERGENCY_CHAT':
+            iconElement = <MessageSquare className="text-red-500 animate-pulse" size={20} />;
+            borderLeftColor = '#ef4444'; // Red 500
+            badgeText = 'Khẩn cấp';
+            badgeBg = '#fef2f2';
+            badgeTextColor = '#b91c1c';
+            break;
+          default:
+            iconElement = <Bell className="text-[#1a5d9f]" size={20} />;
+            borderLeftColor = '#1a5d9f';
+            badgeText = 'Thông báo';
+            badgeBg = '#f8fafc';
+            badgeTextColor = '#475569';
+        }
+
+        // Hiển thị thông báo nổi ở góc màn hình (Premium Rich Notification Card)
+        antdNotification.open({
+          message: (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <span 
+                  className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider" 
+                  style={{ backgroundColor: badgeBg, color: badgeTextColor }}
+                >
+                  {badgeText}
+                </span>
+                <span className="text-[10px] text-gray-400 font-medium">
+                  {new Date().toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <span className="font-bold text-[14px] text-slate-800 leading-snug mt-1">
+                {notification.title}
+              </span>
             </div>
           ),
-          icon: <BellIcon />,
-          duration: 5,
+          description: (
+            <div className="text-[12.5px] text-slate-600 mt-2 leading-relaxed font-medium">
+              {notification.content}
+              <div className="mt-3 flex items-center justify-end text-xs font-semibold text-[#1a5d9f] hover:text-[#1b75c8] gap-1 transition-colors">
+                <span>Xem chi tiết</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
+            </div>
+          ),
+          placement: "topRight",
+          icon: <div className="p-2 rounded-xl bg-slate-50 flex items-center justify-center border border-slate-100">{iconElement}</div>,
+          duration: 10,
+          style: {
+            borderRadius: 16,
+            boxShadow: '0 20px 40px rgba(13, 47, 86, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)',
+            border: '1px solid #eef2f6',
+            borderLeft: `4px solid ${borderLeftColor}`,
+            backgroundColor: '#ffffff',
+            cursor: 'pointer',
+            padding: '16px 20px',
+            width: '380px',
+          },
+          onClick: () => {
+            if (notification.type === "EMERGENCY_CHAT") {
+              navigate("/messages-realtime");
+            } else if (
+              notification.type === "NEW_REFLECTION" ||
+              notification.type === "NEARBY_REFLECTION"
+            ) {
+              if (notification.referenceId) {
+                navigate(`/app/reflection-manager/detail/${notification.referenceId}`);
+              } else {
+                navigate(`/app/reflection-manager/list`);
+              }
+            } else {
+              setSelectedNotification(notification);
+            }
+          }
         });
       });
 
@@ -307,7 +437,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         socket.disconnect();
       }
     };
-  }, [fetchUnreadCount]);
+  }, [fetchUnreadCount, queryClient]);
 
   const time = now.toLocaleTimeString("en-US", {
     hour: "2-digit",
@@ -383,13 +513,15 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               <X className="text-slate-700 hover:text-slate-600" size={24} />
             </div>
           </Tooltip>
-          <div className="flex justify-center mb-2 bg-[#FAFAFA]!">
-            <img
-              loading="lazy"
-              alt="Image Auth"
-              className="lg:w-[217px] lg:h-[139px] md:w-[143px] md:h-[90px] w-[101px] rounded-[10px] h-[70px] mix-blend-multiply"
-              src="/image-logo.png"
-            />
+          <div className="relative flex justify-center mb-2 gap-1">
+            <div className="lg:w-[180px] lg:h-[180px] w-[120px] h-[120px] rounded-full overflow-hidden flex items-center justify-center shrink-0 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100/50">
+              <img
+                loading="lazy"
+                alt="Image Auth"
+                className="w-[105%] h-[105%] max-w-[105%] object-cover"
+                src="/image-logo.png"
+              />
+            </div>
           </div>
           <h3 className="lg:text-[30px] text-[24px] mb-2 text-center font-semibold text-[#144c65]">
             Đổi mật khẩu
@@ -413,8 +545,11 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               Hủy
             </Button>
             <Button
+              loading={isLoadingLogout}
               onClick={async () => {
+                setIsLoadingLogout(true);
                 try {
+                  await new Promise((resolve) => setTimeout(resolve, 500));
                   // 🔥 Gọi API logout với deviceId
                   const deviceId = getDeviceId();
                   await logoutApi(deviceId || undefined);
@@ -432,6 +567,8 @@ export default function Header({ onMenuToggle }: HeaderProps) {
                   localStorage.removeItem("user");
                   clearDeviceId();
                   navigate("/login");
+                } finally {
+                  setIsLoadingLogout(false);
                 }
               }}
               type="primary"
@@ -465,7 +602,8 @@ export default function Header({ onMenuToggle }: HeaderProps) {
             >
               Đóng
             </Button>
-            {selectedNotification?.referenceId && (
+            {(selectedNotification?.referenceId ||
+              selectedNotification?.type === "EMERGENCY_CHAT") && (
               <Button
                 key="go"
                 onClick={() => {
@@ -582,7 +720,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
                     className="w-full h-full object-cover"
                   />
                 </span>
-                <span className="hidden sm:inline-block max-w-[100px] truncate">
+                <span className="hidden sm:inline-block ">
                   {user?.fullName}
                 </span>
               </div>

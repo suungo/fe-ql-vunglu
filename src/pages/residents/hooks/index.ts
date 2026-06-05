@@ -4,7 +4,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { filterResidents } from "../apis"
-import { createResident, deleteResident, getResidentById, getResidents, updateResident } from "../apis"
+import { createResident, deleteResident, getResidentById, getResidents, updateResident, getResidentVerificationHistory } from "../apis"
 import type { CreateResident, UpdateResident } from "../interfaces"
 
 export const useResidents = (filter: filterResidents) => {
@@ -54,5 +54,14 @@ export const useResidentById = (id: number) => {
         staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
         retry: 3,
+    })
+}
+
+// hook lấy lịch sử xác thực cư dân theo phoneNumber
+export const useResidentVerificationHistory = (phoneNumber?: string) => {
+    return useQuery({
+        queryKey: ['resident-verification-history', phoneNumber],
+        queryFn: () => getResidentVerificationHistory(phoneNumber!),
+        enabled: !!phoneNumber,
     })
 }

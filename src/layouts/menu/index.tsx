@@ -9,6 +9,7 @@ import {
 } from "@/components/base/icons";
 import {
   AlertTriangle,
+  ArrowRightLeft,
   ChevronLeft,
   ShieldCheck as ShieldCheckIcon,
   UserIcon,
@@ -84,6 +85,23 @@ export default function Menu({
               />
             ),
             path: "/app/verification-manager/list",
+          },
+        ]
+      : []),
+    ...(profileData?.role.roleCode === Role.ADMIN ||
+    profileData?.role.roleCode === Role.MANAGER
+      ? [
+          {
+            key: "dispatch",
+            label: "Quản lý điều chuyển",
+            icon: (isActive: boolean) => (
+              <ArrowRightLeft
+                height={22}
+                width={22}
+                className={isActive ? "text-white" : "text-sky-400"}
+              />
+            ),
+            path: "/app/dispatch-manager/list",
           },
         ]
       : []),

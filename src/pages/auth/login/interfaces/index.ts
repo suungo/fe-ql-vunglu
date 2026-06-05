@@ -4,6 +4,8 @@ export interface LoginRequest {
   deviceId?: string;
   deviceName?: string;
   deviceType?: string;
+  expoPushToken?: string;
+  webPushSub?: any;
 }
 
 export interface LoginResponseData {

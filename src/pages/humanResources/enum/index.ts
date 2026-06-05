@@ -5,7 +5,9 @@ export enum HumanResourcesStatus {
 }
 
 export enum HumanResourcesPosition {
- OFFICER = 'OFFICER',  // Cán bộ phường (công an)
-  LEADER = 'LEADER',    // Trưởng/phó khu phố (Tình nguyện viên)
-  STAFF = 'STAFF',      // Nhân viên y tế
+  OFFICER = "OFFICER", // Cán bộ tăng cường
+  STAFF = "STAFF", // Nhân viên y tế
+  POSTOFFICER = "POSTOFFICER", // Cán bộ hậu kiểm
+  ELECTRICITYSTAFF = "ELECTRICITYSTAFF", // Nhân viên điện lực
+  PATROL = "PATROL", // Cán bộ tuần tra
 }
