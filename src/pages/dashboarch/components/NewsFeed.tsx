@@ -138,7 +138,7 @@ const NewsFeedItem = ({
         // getCommentCount trả về { statusCode, data: { count } }
         if (commentCountRes?.data?.data?.count !== undefined)
           setCommentCount(Number(commentCountRes.data.data.count) || 0);
-      } catch (_) {}
+      } catch (_) { /* ignore */ }
     };
     loadLikes();
   }, [item.id]);
@@ -187,6 +187,7 @@ const NewsFeedItem = ({
           })),
         );
       } catch (_) {
+        // ignore fetch error
       } finally {
         setCommentLoading(false);
       }
@@ -219,7 +220,7 @@ const NewsFeedItem = ({
       };
       setComments((prev) => [...prev, newComment]);
       setCommentCount((prev) => prev + 1);
-    } catch (_) {}
+    } catch (_) { /* ignore */ }
   };
 
   return (

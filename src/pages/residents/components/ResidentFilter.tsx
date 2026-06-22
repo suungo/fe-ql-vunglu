@@ -124,7 +124,10 @@ export default function ResidentFilter({ onFilter, onRefresh, loading }: Props) 
   const [filterOpen, setFilterOpen] = useState(false);
 
   const onFilterRef = useRef(onFilter);
-  onFilterRef.current = onFilter;
+  useEffect(() => {
+    onFilterRef.current = onFilter;
+  });
+
   const prevOutputRef = useRef("");
   const isResettingRef = useRef(false);
 

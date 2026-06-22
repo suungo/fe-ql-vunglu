@@ -128,7 +128,9 @@ export default function ReflectionFilter({ onFilter, onRefresh, loading }: Props
   const [filterOpen, setFilterOpen] = useState(false);
 
   const onFilterRef = useRef(onFilter);
-  onFilterRef.current = onFilter;
+  useEffect(() => {
+    onFilterRef.current = onFilter;
+  });
 
   // Khởi tạo prevOutputRef khớp với URL ban đầu
   const initialOutputJson = useMemo(() => {
