@@ -15,6 +15,7 @@ export interface HumanResources extends BaseFields{
   gender: Gender; // Giới tính
   status: string; // Trạng thái
   notes?: string;
+  userId?: number;
 }
 
 export interface CreateHumanResources {
@@ -28,8 +29,7 @@ export interface CreateHumanResources {
   gender: Gender; // Giới tính
   status: string; // Trạng thái
   notes?: string;
+  evidenceType?: 'image' | 'document';
+  evidenceFile?: File;
 }
 
-
-export interface UpdateHumanResources extends CreateHumanResources {
-}

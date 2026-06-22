@@ -16,6 +16,17 @@ import { motion } from "framer-motion";
 import React, { useEffect, useRef, useState } from "react";
 import { ReflectionStatus } from "../../reflection/enum";
 import type { Reflection } from "../../reflection/interfaces";
+import { useQuery } from "@tanstack/react-query";
+import { getProfileApi } from "@/pages/profile/api";
+import { Role } from "@/enums";
+import {
+  toggleLikeApi,
+  checkLikedApi,
+  getLikeCountApi,
+  getCommentsApi,
+  createCommentApi,
+  getCommentCountApi,
+} from "../api/interactionApi";
 
 import {
   Award,
@@ -44,12 +55,14 @@ interface Comment {
 }
 
 interface User {
+  id?: number;
   name: string;
   avatar: string;
   role?: {
     roleName: string;
     roleCode: string;
   };
+  reputationPoints?: number;
 }
 
 interface NewsItem {
@@ -71,203 +84,142 @@ const mockUserStats = {
   reputation: 98,
 };
 
-const UserProfileModal = ({
-  user,
-  open,
-  onClose,
-}: {
-  user: User | null;
-  open: boolean;
-  onClose: () => void;
-}) => {
-  if (!user) return null;
+const getReputationLevel = (points: number) => {
+  if (points === 10) return { label: "Xuất sắc", color: "success" };
+  if (points >= 8) return { label: "Tốt", color: "processing" };
+  if (points >= 5) return { label: "Trung bình", color: "warning" };
+  if (points > 0) return { label: "Cảnh cáo", color: "error" };
+  return { label: "Tạm khóa", color: "default" };
+};
 
-  return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      centered
-      width={400}
-      className="rounded-2xl overflow-hidden"
-    >
-      <div className="flex flex-col items-center pt-6 pb-2">
-        <div className="relative mb-4">
-          <Avatar
-            src={user.avatar}
-            size={100}
-            className="border-4 border-white shadow-lg"
-          />
-          {user.role && (
-            <div className="absolute bottom-0 right-0 bg-blue-500 text-white p-1.5 rounded-full shadow-md border-2 border-white">
-              <ShieldCheck size={16} />
-            </div>
-          )}
-        </div>
+import { UserProfileModal } from "./UserProfileModal";
 
-        <Title level={4} className="!m-0 text-slate-800">
-          {user.name}
-        </Title>
-        <Text className="text-slate-500 mb-4">
-          {user.role?.roleName || "Thành viên tích cực"}
-        </Text>
-
-        <div className="flex gap-2 mb-6">
-          <Tag icon={<Calendar size={12} />} color="default">
-            Tham gia 2023
-          </Tag>
-          <Tag icon={<MapPin size={12} />} color="default">
-            TP.HCM
-          </Tag>
-        </div>
-
-        <div className="w-full bg-slate-50 rounded-xl p-4 mb-6">
-          <Row gutter={16} className="text-center">
-            <Col span={8}>
-              <Statistic
-                title={
-                  <span className="text-xs text-slate-500">Đã báo cáo</span>
-                }
-                value={mockUserStats.reports}
-                formatter={(value) => (
-                  <span style={{ fontSize: "18px", fontWeight: "bold" }}>
-                    {value}
-                  </span>
-                )}
-              />
-            </Col>
-            <Col span={8} className="border-l border-r border-slate-200">
-              <Statistic
-                title={<span className="text-xs text-slate-500">Hữu ích</span>}
-                value={mockUserStats.helpful}
-                formatter={(value) => (
-                  <span
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: "bold",
-                      color: "#10b981",
-                    }}
-                  >
-                    {value}
-                  </span>
-                )}
-              />
-            </Col>
-            <Col span={8}>
-              <Statistic
-                title={<span className="text-xs text-slate-500">Uy tín</span>}
-                value={mockUserStats.reputation}
-                formatter={(value) => (
-                  <span
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: "bold",
-                      color: "#3b82f6",
-                    }}
-                  >
-                    {value}
-                  </span>
-                )}
-                suffix={
-                  <Award size={14} className="inline text-yellow-500 mb-1" />
-                }
-              />
-            </Col>
-          </Row>
-        </div>
-
-        <div className="w-full">
-          <Text strong className="block mb-3 text-slate-700">
-            Hoạt động gần đây
-          </Text>
-          <div className="space-y-3">
-            {[1, 2, 3].map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center flex-shrink-0">
-                  <MapPin size={16} className="text-slate-400" />
-                </div>
-                <div className="flex-1 overflow-hidden">
-                  <Text className="block text-sm font-medium truncate">
-                    Cảnh báo ngập tại Quận {i + 1}
-                  </Text>
-                  <Text className="block text-xs text-slate-400">
-                    {i + 2} ngày trước • Đã duyệt
-                  </Text>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
+const obfuscateName = (name?: string) => {
+  if (!name) return "Ẩn danh";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return name.charAt(0) + "***";
+  return `${parts[0]} *** ${parts[parts.length - 1].charAt(0)}***`;
 };
 
 const NewsFeedItem = ({
   item,
   onUserClick,
+  canViewProfile,
 }: {
   item: NewsItem;
   onUserClick: (user: User) => void;
+  canViewProfile: boolean;
 }) => {
-  const [liked, setLiked] = useState<boolean>(item.isLiked);
-  const [likesCount, setLikesCount] = useState<number>(item.likes);
+  const [liked, setLiked] = useState<boolean>(false);
+  const [likesCount, setLikesCount] = useState<number>(0);
+  const [likeLoading, setLikeLoading] = useState(false);
   const [showComments, setShowComments] = useState<boolean>(false);
-  const [comments, setComments] = useState<Comment[]>(item.comments);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentCount, setCommentCount] = useState(0);
+  const [commentLoading, setCommentLoading] = useState(false);
   const [commentInput, setCommentInput] = useState<string>("");
   const inputRef = useRef<InputRef>(null);
 
-  const handleLike = () => {
-    if (liked) {
-      setLikesCount((prev) => prev - 1);
-    } else {
-      setLikesCount((prev) => prev + 1);
+  // Fetch số like và trạng thái like khi mount
+  useEffect(() => {
+    const loadLikes = async () => {
+      try {
+        const [likedRes, countRes, commentCountRes] = await Promise.all([
+          checkLikedApi(item.id).catch(() => null),
+          getLikeCountApi(item.id).catch(() => null),
+          getCommentCountApi(item.id).catch(() => null),
+        ]);
+        // checkLiked trả về { liked: boolean } (không có wrapper data)
+        if (likedRes?.data?.liked !== undefined)
+          setLiked(!!likedRes.data.liked);
+        // getLikeCount trả về { statusCode, data: { count } }
+        if (countRes?.data?.data?.count !== undefined)
+          setLikesCount(Number(countRes.data.data.count) || 0);
+        // getCommentCount trả về { statusCode, data: { count } }
+        if (commentCountRes?.data?.data?.count !== undefined)
+          setCommentCount(Number(commentCountRes.data.data.count) || 0);
+      } catch (_) {}
+    };
+    loadLikes();
+  }, [item.id]);
+
+  const handleLike = async () => {
+    if (likeLoading) return;
+    setLikeLoading(true);
+    const wasLiked = liked;
+    // Optimistic update
+    setLiked(!wasLiked);
+    setLikesCount((prev) => (wasLiked ? prev - 1 : prev + 1));
+    try {
+      await toggleLikeApi(item.id);
+    } catch (_) {
+      // Rollback
+      setLiked(wasLiked);
+      setLikesCount((prev) => (wasLiked ? prev + 1 : prev - 1));
+    } finally {
+      setLikeLoading(false);
     }
-    setLiked(!liked);
   };
 
-  const handleLikeComment = (commentId: number) => {
-    setComments((prev) =>
-      prev.map((c) => {
-        if (c.id === commentId) {
-          return {
-            ...c,
-            isLiked: !c.isLiked,
-            likes: c.isLiked ? c.likes - 1 : c.likes + 1,
-          };
-        }
-        return c;
-      }),
-    );
+  const handleToggleComments = async () => {
+    const next = !showComments;
+    setShowComments(next);
+    if (next && comments.length === 0) {
+      setCommentLoading(true);
+      try {
+        const res = await getCommentsApi(item.id);
+        // getComments trả về { statusCode, data: [...], meta: {...} }
+        const data = res?.data?.data || [];
+        setComments(
+          data.map((c: any) => ({
+            id: c.id,
+            user: c.user?.fullName || "Người dùng",
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${c.user?.id || c.id}`,
+            content: c.content,
+            timestamp: new Date(c.createdAt).toLocaleString("vi-VN", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            likes: 0,
+            isLiked: false,
+          })),
+        );
+      } catch (_) {
+      } finally {
+        setCommentLoading(false);
+      }
+    }
   };
 
   const handleReplyComment = (username: string) => {
     setCommentInput(`@${username} `);
     setTimeout(() => {
-      inputRef.current?.focus({
-        cursor: "end",
-      });
+      inputRef.current?.focus({ cursor: "end" });
     }, 0);
   };
 
-  const handleSendComment = () => {
+  const handleSendComment = async () => {
     if (!commentInput.trim()) return;
-
-    const newComment: Comment = {
-      id: Date.now(),
-      user: "Tôi", // In a real app, this would be the current user's name
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Me",
-      content: commentInput,
-      timestamp: "Vừa xong",
-      likes: 0,
-      isLiked: false,
-    };
-
-    setComments((prev) => [...prev, newComment]);
+    const content = commentInput.trim();
     setCommentInput("");
+    try {
+      const res = await createCommentApi(item.id, content);
+      // createComment trả về { statusCode: 201, data: commentWithUser }
+      const c = res?.data?.data;
+      const newComment: Comment = {
+        id: c?.id || Date.now(),
+        user: c?.user?.fullName || "Tôi",
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${c?.user?.id || "me"}`,
+        content: c?.content || content,
+        timestamp: "Vừa xong",
+        likes: 0,
+        isLiked: false,
+      };
+      setComments((prev) => [...prev, newComment]);
+      setCommentCount((prev) => prev + 1);
+    } catch (_) {}
   };
 
   return (
@@ -275,8 +227,8 @@ const NewsFeedItem = ({
       <div className="flex flex-col sm:flex-row justify-between items-start gap-3 mb-4">
         <div className="flex gap-3 w-full sm:w-auto">
           <div
-            className="relative cursor-pointer group"
-            onClick={() => onUserClick(item.user)}
+            className={`relative group ${canViewProfile ? "cursor-pointer" : ""}`}
+            onClick={() => canViewProfile && onUserClick(item.user)}
           >
             <Avatar
               src={item.user.avatar}
@@ -292,11 +244,24 @@ const NewsFeedItem = ({
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <Text
-                className="text-sm md:text-[15px] font-bold text-slate-800 cursor-pointer hover:text-blue-600 transition-colors whitespace-nowrap"
-                onClick={() => onUserClick(item.user)}
+                className={`text-sm md:text-[15px] font-bold text-slate-800 whitespace-nowrap transition-colors ${canViewProfile ? "cursor-pointer hover:text-blue-600" : ""}`}
+                onClick={() => canViewProfile && onUserClick(item.user)}
               >
-                {item.user.name}
+                {canViewProfile
+                  ? item.user.name
+                  : obfuscateName(item.user.name)}
               </Text>
+              {item.user.role?.roleCode === "RESIDENT" && (
+                <Tag
+                  color={
+                    getReputationLevel(item.user.reputationPoints ?? 10).color
+                  }
+                  className="ml-1 text-[11px] font-medium"
+                >
+                  Uy tín: {item.user.reputationPoints ?? 10}/10 (
+                  {getReputationLevel(item.user.reputationPoints ?? 10).label})
+                </Tag>
+              )}
               <span className="text-slate-300 text-[10px] hidden xs:inline">
                 •
               </span>
@@ -327,12 +292,6 @@ const NewsFeedItem = ({
               Đã duyệt
             </div>
           )}
-          <Button
-            type="text"
-            shape="circle"
-            icon={<MoreHorizontal size={16} />}
-            className="text-slate-400 hover:bg-slate-50 h-8 w-8"
-          />
         </div>
       </div>
 
@@ -352,118 +311,6 @@ const NewsFeedItem = ({
           />
         </div>
       )}
-
-      <div className="flex items-center justify-between pt-2">
-        <div className="flex gap-4">
-          <button
-            onClick={handleLike}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
-              liked
-                ? "bg-red-50 text-red-500"
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-            }`}
-          >
-            <Heart size={18} className={liked ? "fill-current" : ""} />
-            <span>{likesCount}</span>
-          </button>
-
-          <button
-            onClick={() => setShowComments(!showComments)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all"
-          >
-            <MessageCircle size={18} />
-            <span>{comments.length}</span>
-          </button>
-
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all">
-            <Share2 size={18} />
-            <span className="hidden sm:inline">Chia sẻ</span>
-          </button>
-        </div>
-      </div>
-
-      {showComments && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: "auto" }}
-          className="mt-4 pt-4 border-t border-slate-100"
-        >
-          {comments.map((comment) => (
-            <div key={comment.id} className="flex gap-3 mb-4 last:mb-0 group">
-              <Avatar
-                src={comment.avatar}
-                size={32}
-                className="mt-1 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() =>
-                  onUserClick({ name: comment.user, avatar: comment.avatar })
-                }
-              />
-              <div className="flex-1">
-                <div className="bg-slate-50 p-3 rounded-2xl rounded-tl-none inline-block max-w-full">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Text
-                      className="font-bold text-xs text-slate-800 cursor-pointer hover:text-blue-600 transition-colors"
-                      onClick={() =>
-                        onUserClick({
-                          name: comment.user,
-                          avatar: comment.avatar,
-                        })
-                      }
-                    >
-                      {comment.user}
-                    </Text>
-                    <Text className="text-[10px] text-slate-400">
-                      {comment.timestamp}
-                    </Text>
-                  </div>
-                  <Text className="text-sm text-slate-600 block leading-normal">
-                    {comment.content}
-                  </Text>
-                </div>
-                <div className="flex gap-3 mt-1 ml-2">
-                  <button
-                    className={`text-[11px] font-semibold hover:text-slate-600 transition-colors ${comment.isLiked ? "text-blue-600" : "text-slate-400"}`}
-                    onClick={() => handleLikeComment(comment.id)}
-                  >
-                    Thích {comment.likes > 0 && `(${comment.likes})`}
-                  </button>
-                  <button
-                    className="text-[11px] font-semibold text-slate-400 hover:text-slate-600"
-                    onClick={() => handleReplyComment(comment.user)}
-                  >
-                    Phản hồi
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-          <div className="flex gap-3 mt-4">
-            <Avatar
-              src="https://api.dicebear.com/7.x/avataaars/svg?seed=Me"
-              size={36}
-              className="shadow-sm"
-            />
-            <div className="flex-1 relative group">
-              <Input
-                ref={inputRef}
-                placeholder="Viết bình luận..."
-                className="rounded-full pl-4 pr-12 py-2 bg-slate-50 border-transparent hover:bg-white hover:border-slate-200 focus:bg-white focus:border-blue-400 transition-all shadow-sm"
-                value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
-                onPressEnter={handleSendComment}
-              />
-              <Button
-                type="text"
-                shape="circle"
-                icon={<Send size={16} />}
-                className="absolute right-1 top-1/2 -translate-y-1/2 text-blue-500 hover:bg-blue-50 z-10"
-                onClick={handleSendComment}
-                onMouseDown={(e) => e.preventDefault()}
-              />
-            </div>
-          </div>
-        </motion.div>
-      )}
     </div>
   );
 };
@@ -472,6 +319,18 @@ const NewsFeed: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [reflections, setReflections] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { data: profileData } = useQuery({
+    queryKey: ["profile"],
+    queryFn: async () => {
+      const response = await getProfileApi();
+      return response?.data;
+    },
+  });
+
+  const canViewProfile =
+    profileData?.role?.roleCode === Role.ADMIN ||
+    profileData?.role?.roleCode === Role.MANAGER;
 
   useEffect(() => {
     const fetchReflections = async () => {
@@ -489,13 +348,16 @@ const NewsFeed: React.FC = () => {
         if (json.statusCode === 200 && Array.isArray(json.data)) {
           const approvedReflections = json.data.map((r: Reflection) => ({
             id: r.id,
+            userId: r.user?.id,
             user: {
+              id: r.user?.id,
               name: r.user?.fullName || "Người dùng ẩn danh",
               avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=" + r.id,
               role: r.user?.role || {
-                roleName: "Cư dân",
+                roleName: "Người dân",
                 roleCode: "RESIDENT",
               },
+              reputationPoints: r.user?.reputationPoints ?? 10,
             },
             content: r.content,
             image:
@@ -509,7 +371,7 @@ const NewsFeed: React.FC = () => {
               hour: "2-digit",
               minute: "2-digit",
             }),
-            likes: Math.floor(Math.random() * 50), // Mock tạm do DB chưa có table Like
+            likes: 0, // DB chưa có table Like
             isLiked: false,
             comments: [], // Mock tạm do DB chưa có table Comment
           }));
@@ -541,21 +403,18 @@ const NewsFeed: React.FC = () => {
   return (
     <div className="py-4">
       <UserProfileModal
-        user={selectedUser}
-        open={!!selectedUser}
+        userId={selectedUser?.id ?? null}
+        open={!!selectedUser?.id}
         onClose={() => setSelectedUser(null)}
       />
 
       <div className="flex items-center justify-between mb-4 px-1">
         <div className="flex items-center gap-2">
           <div className="bg-blue-600 w-1 h-6 rounded-full"></div>
-          <Title level={4} className="!m-0 text-slate-800">
+          <Title level={4} className="m-0! text-slate-800">
             Bảng tin phản ánh
           </Title>
         </div>
-        <Button type="link" className="text-blue-600 p-0 font-medium">
-          Xem tất cả
-        </Button>
       </div>
 
       <div className="space-y-4">
@@ -573,7 +432,11 @@ const NewsFeed: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
             >
-              <NewsFeedItem item={item} onUserClick={handleUserClick} />
+              <NewsFeedItem
+                item={item}
+                onUserClick={handleUserClick}
+                canViewProfile={canViewProfile}
+              />
             </motion.div>
           ))
         )}

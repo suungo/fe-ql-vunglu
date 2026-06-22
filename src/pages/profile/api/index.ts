@@ -37,3 +37,33 @@ export const changePassword = async (data: ChangePasswordRequest) => {
 
   return response.data
 }
+
+// Lấy danh sách thiết bị đang hoạt động (lịch sử đăng nhập)
+export const getUserDevicesApi = async () => {
+  const response = await BASE_URL.get("/auth/devices", {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    },
+  });
+  return response.data;
+};
+
+// Đăng xuất thiết bị cụ thể
+export const deactivateDeviceApi = async (deviceId: string) => {
+  const response = await BASE_URL.post("/auth/logout", { deviceId }, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    },
+  });
+  return response.data;
+};
+
+// Lấy lịch sử biến động điểm uy tín
+export const getReputationHistoryApi = async () => {
+  const response = await BASE_URL.get("/users/reputation-history", {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    },
+  });
+  return response.data;
+};

@@ -269,7 +269,7 @@ const containerVariants = {
 
 const OtherInfo: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<CategoryType | null>(
-    null
+    null,
   );
 
   const handleCategoryClick = (id: string) => {
@@ -447,7 +447,7 @@ const OtherInfo: React.FC = () => {
                 onClick={handleBack}
                 className="hover:bg-slate-100"
               />
-              <Title level={5} className="!m-0 text-slate-700">
+              <Title level={5} className="m-0! text-slate-700">
                 {categories.find((c) => c.id === activeCategory)?.title}
               </Title>
             </div>

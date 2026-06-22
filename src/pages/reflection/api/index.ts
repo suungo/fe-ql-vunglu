@@ -12,7 +12,8 @@ export interface ParamsReflection {
   keyword?: string
   category?: string
   priority?: string
-  status?: ReflectionStatus,
+  status?: ReflectionStatus;
+  assignedUserId?: number;
 }
 // Api thêm phản ánh
 export const createReflectionApi = async (data: CreateReflection) => {
@@ -42,6 +43,16 @@ export const getReflectionsApi = async (params: ParamsReflection) => {
       Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
     },
     params,
+  });
+  return response.data;
+};
+
+// API lấy thống kê nhiệm vụ được giao
+export const getAssignedStatsApi = async (userId: number) => {
+  const response = await BASE_URL.get(`/${REPORT}/assigned-stats/${userId}`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    },
   });
   return response.data;
 };
@@ -95,7 +106,7 @@ export const uploadApi = async (file: File) => {
 /** [OFFICER] Bước 3: Xác minh thực địa phản ánh */
 export const verifyReflectionApi = async (
   id: number,
-  data: { confirmed: boolean; rejectReason?: string; note?: string }
+  data: { confirmed: boolean; rejectReason?: string; note?: string; priority?: string }
 ) => {
   const response = await BASE_URL.patch(`/${REPORT}/${id}/verify`, data, {
     headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
@@ -141,13 +152,20 @@ export const acceptByPatrolApi = async (id: number) => {
   return response.data;
 };
 
+/** [PATROL] Cập nhật vị trí GPS */
+export const updatePatrolLocationApi = async (id: number, data: { lat: number; lng: number }) => {
+  const response = await BASE_URL.patch(`/${REPORT}/${id}/patrol-location`, data, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
 /** [PATROL] Bước 8: Nộp báo cáo kết quả thực địa */
 export const submitPatrolReportApi = async (
   id: number,
   data: {
     resolved: boolean;
     patrolReport: string;
-    needReinforcement?: boolean;
     incompleteReason?: string;
   }
 ) => {
@@ -159,7 +177,94 @@ export const submitPatrolReportApi = async (
 
 /** [INSPECTOR/MANAGER] Bước 9: Xác nhận hoàn thành và gửi báo cáo */
 export const inspectorConfirmApi = async (id: number, data: { note?: string }) => {
-  const response = await BASE_URL.patch(`/${REPORT}/${id}/inspector-confirm`, data, {
+  const response = await BASE_URL.patch(`/${REPORT}/${id}/manager-confirm`, data, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+// API lấy các phản ánh đã giải quyết (RESOLVED) để quản lý phường đăng lên bản đồ
+export const getResolvedReflectionsApi = async () => {
+  const response = await BASE_URL.get(`/${REPORT}`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+    },
+    params: {
+      status: "RESOLVED",
+      limit: 100,
+    },
+  });
+  return response.data;
+};
+
+// ══════════════════════════════════════════════════════════════════════
+// LIKES ENDPOINTS
+// ══════════════════════════════════════════════════════════════════════
+
+/** Toggle like/unlike phản ánh */
+export const toggleLikeApi = async (reflectionId: number) => {
+  const response = await BASE_URL.post(`/${REPORT}/${reflectionId}/like`, {}, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+/** Kiểm tra đã like chưa */
+export const checkLikedApi = async (reflectionId: number) => {
+  const response = await BASE_URL.get(`/${REPORT}/${reflectionId}/liked`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+/** Lấy số lượng likes */
+export const getLikeCountApi = async (reflectionId: number) => {
+  const response = await BASE_URL.get(`/${REPORT}/${reflectionId}/likes/count`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+// ══════════════════════════════════════════════════════════════════════
+// COMMENTS ENDPOINTS
+// ══════════════════════════════════════════════════════════════════════
+
+/** Lấy danh sách bình luận */
+export const getCommentsApi = async (reflectionId: number, page = 1, limit = 20) => {
+  const response = await BASE_URL.get(`/${REPORT}/${reflectionId}/comments`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+    params: { page, limit },
+  });
+  return response.data;
+};
+
+/** Tạo bình luận mới */
+export const createCommentApi = async (reflectionId: number, content: string, parentId?: number) => {
+  const response = await BASE_URL.post(`/${REPORT}/${reflectionId}/comments`, { content, parentId }, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+/** Xóa bình luận */
+export const deleteCommentApi = async (commentId: number) => {
+  const response = await BASE_URL.delete(`/${REPORT}/comments/${commentId}`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+/** Lấy số lượng bình luận */
+export const getCommentCountApi = async (reflectionId: number) => {
+  const response = await BASE_URL.get(`/${REPORT}/${reflectionId}/comments/count`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+  });
+  return response.data;
+};
+
+/** Đánh giá chất lượng xử lý của cán bộ */
+export const rateReflectionApi = async (id: number, data: { rating: number; comment?: string }) => {
+  const response = await BASE_URL.patch(`/${REPORT}/${id}/rate`, data, {
     headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
   });
   return response.data;

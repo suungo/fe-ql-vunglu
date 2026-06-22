@@ -12,35 +12,89 @@ export const exportToExcel = (
   headerMap: Record<string, string>
 ) => {
   const keys = Object.keys(headerMap);
-  
-  const formattedData = data.map((item) => {
-    const formattedItem: any = {};
-    keys.forEach((key) => {
-      formattedItem[headerMap[key]] = item[key];
-    });
-    return formattedItem;
+
+  const thStyle = `
+    border: 1px solid #cbd5e1;
+    padding: 10px 14px;
+    background-color: #144c65;
+    color: #ffffff;
+    font-size: 11pt;
+    font-weight: bold;
+    text-align: left;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  `.replace(/\s+/g, " ");
+
+  const tdStyle = (bgColor: string) => `
+    border: 1px solid #e2e8f0;
+    padding: 8px 12px;
+    background-color: ${bgColor};
+    font-size: 10pt;
+    color: #334155;
+    vertical-align: middle;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  `.replace(/\s+/g, " ");
+
+  const theadCells = keys
+    .map((key) => `<th style="${thStyle}">${headerMap[key]}</th>`)
+    .join("");
+
+  const tbodyRows = data
+    .map((item, index) => {
+      const bgColor = index % 2 === 0 ? "#ffffff" : "#f8fafc";
+      const cells = keys
+        .map((key) => {
+          const val = item[key] ?? "";
+          return `<td style="${tdStyle(bgColor)}">${val}</td>`;
+        })
+        .join("");
+      return `<tr>${cells}</tr>`;
+    })
+    .join("");
+
+  const htmlContent = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:x="urn:schemas-microsoft-com:office:excel"
+          xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <meta charset="utf-8">
+      <!--[if gte mso 9]>
+      <xml>
+        <x:ExcelWorkbook>
+          <x:ExcelWorksheets>
+            <x:ExcelWorksheet>
+              <x:Name>Danh sach</x:Name>
+              <x:WorksheetOptions>
+                <x:DisplayGridlines/>
+              </x:WorksheetOptions>
+            </x:ExcelWorksheet>
+          </x:ExcelWorksheets>
+        </x:ExcelWorkbook>
+      </xml>
+      <![endif]-->
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        table { border-collapse: collapse; }
+      </style>
+    </head>
+    <body>
+      <table>
+        <thead><tr>${theadCells}</tr></thead>
+        <tbody>${tbodyRows}</tbody>
+      </table>
+    </body>
+    </html>`;
+
+  const blob = new Blob(["\ufeff", htmlContent], {
+    type: "application/vnd.ms-excel;charset=utf-8",
   });
-
-  const worksheet = XLSX.utils.json_to_sheet(formattedData);
-
-  // Tự động căn chỉnh độ rộng cột (Auto-fit width)
-  const colWidths = keys.map((key) => {
-    const headerTitle = headerMap[key] || "";
-    // Tìm độ dài lớn nhất trong dữ liệu cột đó, hoặc lấy độ dài tiêu đề
-    const maxLength = data.reduce((max, item) => {
-      const cellValue = item[key] ? String(item[key]) : "";
-      return Math.max(max, cellValue.length);
-    }, headerTitle.length);
-    
-    // Thêm padding cho dễ nhìn (giới hạn tối đa 60 ký tự để không quá to)
-    return { wch: Math.min(maxLength + 3, 60) };
-  });
-
-  worksheet["!cols"] = colWidths;
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
-  XLSX.writeFile(workbook, `${fileName}.xlsx`);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${fileName}.xls`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
 /**

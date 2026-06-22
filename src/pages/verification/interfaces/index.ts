@@ -31,6 +31,8 @@ export interface Verification {
   };
   attachments?: string[];
   referenceId?: number;
+  cccd?: string;             // Số CCCD người dân khai khi đăng ký
+  isMatchedContact?: boolean; // Có khớp danh sách liên hệ không
   createdAt: string;
   updatedAt: string;
 }

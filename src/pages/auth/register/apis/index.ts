@@ -33,7 +33,11 @@ export const deleteUserApi = async (id: number) => {
 
 // API người dân đăng ký tài khoản có xác thực 
 export const registerWithVerificationApi = async (values: RegisterRequest) => {
-    // Gọi đến backend xác thực cư dân (chạy ở port 3002, prefix /api/v1)
-    const response = await axios.post("http://localhost:3002/api/v1/verifications", values);
+    // Gọi đến backend xác thực người dân (chạy ở port 3002, prefix /api/v1)
+    const isProd = window.location.hostname === 'ql-vunglu.site';
+    const verificationUrl = isProd
+      ? "https://ql-vunglu.site/api-dancu/v1/verifications"
+      : "http://localhost:3002/v1/verifications";
+    const response = await axios.post(verificationUrl, values);
     return response.data;
 }

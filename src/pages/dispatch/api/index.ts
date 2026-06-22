@@ -10,6 +10,7 @@ export interface DispatchReportParams {
   status?: DispatchReportStatus;
   type?: DispatchReportType;
   reflectionId?: number;
+  search?: string;
 }
 
 /** Danh sách biên bản điều chuyển */
@@ -45,6 +46,7 @@ export const createDispatchToInspectorApi = async (data: {
   title?: string;
   description?: string;
   note?: string;
+  expectedTime?: string;
 }) => {
   const response = await BASE_URL.post<ApiResponse<DispatchReport>>(
     `/${PATH}/to-inspector`,
@@ -57,10 +59,12 @@ export const createDispatchToInspectorApi = async (data: {
 /** [INSPECTOR] Tạo điều chuyển cho Tuần tra */
 export const createDispatchToPatrolApi = async (data: {
   reflectionId: number;
-  assignedTo: number;
+  assignedTo?: number;
+  customHandler?: string;
   title?: string;
   description?: string;
   note?: string;
+  expectedTime?: string;
 }) => {
   const response = await BASE_URL.post<ApiResponse<DispatchReport>>(
     `/${PATH}/to-patrol`,
@@ -91,6 +95,7 @@ export const updateDispatchReportApi = async (
     attachments?: string[];
     title?: string;
     description?: string;
+    expectedTime?: string;
   },
 ) => {
   const response = await BASE_URL.patch<ApiResponse<DispatchReport>>(
@@ -110,9 +115,9 @@ export const deleteDispatchReportApi = async (id: number) => {
 };
 
 /** Lấy danh sách phản ánh đã xác minh */
-export const getVerifiedReflectionsApi = async () => {
+export const getVerifiedReflectionsApi = async (status = "VERIFIED") => {
   const response = await BASE_URL.get<PaginatedResponse<any>>("/reports", {
-    params: { limit: 100, status: "VERIFIED" },
+    params: { limit: 100, status },
   });
   return response.data;
 };
@@ -122,6 +127,16 @@ export const getStaffByRoleApi = async (roleCode: string) => {
   const response = await BASE_URL.get<PaginatedResponse<{ id: number; fullName: string }>>("/human-resources", {
     params: { roleCode, limit: 100 },
   });
+  return response.data;
+};
+
+/** Thúc giục cán bộ xử lý */
+export const nudgeDispatchApi = async (id: number) => {
+  const response = await BASE_URL.post<ApiResponse<any>>(
+    `/${PATH}/${id}/nudge`,
+    {},
+    { headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` } },
+  );
   return response.data;
 };
 

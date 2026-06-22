@@ -1,11 +1,10 @@
 import { Role } from "@/enums";
-import useDebounce from "@/hooks/useDebounce";
+import "../../floodDamages/styles/floodDamages.css";
 import { getProfileApi } from "@/pages/profile/api";
 import { exportToExcel, exportToWord } from "@/utils/exportUtils";
 import { useQuery } from "@tanstack/react-query";
 import {
   Button,
-  Drawer,
   Dropdown,
   Empty,
   Input,
@@ -20,16 +19,13 @@ import {
 import type { ColumnType } from "antd/es/table";
 import {
   AlertTriangle,
-  CheckCheck,
   CloudRain,
   EllipsisVertical,
   Eye,
   FileSpreadsheet,
   FileText,
-  Filter,
   MapPin,
   Pencil,
-  RefreshCw,
   Search,
   Settings,
   ShieldAlert,
@@ -38,26 +34,37 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-  deleteReflectionApi,
-  getReflectionsApi,
-} from "../api";
+import { deleteReflectionApi, getReflectionsApi } from "../api";
 import { Category, EventType, Priority, ReflectionStatus } from "../enum";
 import type { Reflection } from "../interfaces";
+import ReflectionFilter, {
+  type ReflectionFilterParams,
+} from "../components/ReflectionFilter";
 
 export default function ListReflection() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const [category, setCategory] = useState<Category | undefined>(
-    (searchParams.get("category") as Category) || undefined,
+  const [filterParams, setFilterParams] = useState<ReflectionFilterParams>(
+    () => {
+      return {
+        keyword: searchParams.get("keyword") || undefined,
+        category: (searchParams.get("category") as Category) || undefined,
+        status: (searchParams.get("status") as ReflectionStatus) || undefined,
+        priority: (searchParams.get("priority") as Priority) || undefined,
+      };
+    },
   );
-  const [status, setStatus] = useState<ReflectionStatus | undefined>(
-    (searchParams.get("status") as ReflectionStatus) || undefined,
-  );
-
-  const keywordFromUrl = searchParams.get("keyword") || "";
-  const [keyword, setKeyword] = useState(keywordFromUrl);
   const [page, setPage] = useState<number>(
     Number(searchParams.get("page")) || 1,
   );
@@ -69,21 +76,29 @@ export default function ListReflection() {
   const [idDelete, setIdDelete] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [openFilter, setOpenFilter] = useState(false);
   // API lấy danh sách
   const {
     data: reflections,
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["reflections", page, limit, status, keyword, category],
+    queryKey: [
+      "reflections",
+      page,
+      limit,
+      filterParams.status,
+      filterParams.keyword,
+      filterParams.category,
+      filterParams.priority,
+    ],
     queryFn: () =>
       getReflectionsApi({
         page: page,
         limit: limit,
-        status: status,
-        keyword: keyword,
-        category: category,
+        status: filterParams.status,
+        keyword: filterParams.keyword,
+        category: filterParams.category,
+        priority: filterParams.priority,
       }),
     // thời gian cache là 1 phút
     staleTime: 60 * 1000,
@@ -100,39 +115,46 @@ export default function ListReflection() {
 
   const isAdmin = profileData?.role?.roleCode === Role.ADMIN;
   const isManager = profileData?.role?.roleCode === Role.MANAGER;
-  const roleCode = profileData?.role?.roleCode;
 
   const getRoleName = (roleCode?: string) => {
     switch (roleCode) {
-      case Role.ADMIN:    return "Quản trị viên";
-      case Role.MANAGER:  return "Quản lý phường";
-      case Role.OFFICER:  return "Cán bộ tăng cường";
-      case "INSPECTOR":   return "Hậu kiểm";
-      case "PATROL":      return "Cán bộ tuần tra";
-      case Role.LEADER:   return "Quản lý khu phố";
-      case Role.STAFF:    return "Nhân viên y tế";
-      case Role.RESIDENT: return "Hộ dân / Cư dân";
-      default:            return "Chưa xác định";
+      case Role.ADMIN:
+        return "Quản trị viên";
+      case Role.MANAGER:
+        return "Quản lý phường";
+      case Role.OFFICER:
+        return "Cán bộ tăng cường";
+      case "INSPECTOR":
+        return "Hậu kiểm";
+      case "PATROL":
+        return "Cán bộ tuần tra";
+      case Role.LEADER:
+        return "Quản lý khu phố";
+      case Role.STAFF:
+        return "Nhân viên y tế";
+      case Role.RESIDENT:
+        return "Hộ dân / Cư dân";
+      default:
+        return "Chưa xác định";
     }
   };
 
-  const debouncedKeyword = useDebounce(keyword, 500);
-
   useEffect(() => {
     const params = new URLSearchParams();
-    if (debouncedKeyword.trim()) {
-      params.set("keyword", debouncedKeyword.trim());
+    if (filterParams.keyword?.trim()) {
+      params.set("keyword", filterParams.keyword.trim());
     }
     if (page > 1) params.set("page", page.toString());
     if (limit !== 10) params.set("limit", limit.toString());
-    if (category) params.set("category", category);
-    if (status) params.set("status", status);
+    if (filterParams.category) params.set("category", filterParams.category);
+    if (filterParams.status) params.set("status", filterParams.status);
+    if (filterParams.priority) params.set("priority", filterParams.priority);
 
     setSearchParams(params, { replace: true });
-  }, [debouncedKeyword, page, limit, category, status, setSearchParams]);
+  }, [filterParams, page, limit, setSearchParams]);
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setKeyword(e.target.value);
+  const handleFilter = (params: ReflectionFilterParams) => {
+    setFilterParams(params);
     setPage(1);
   };
 
@@ -216,14 +238,22 @@ export default function ListReflection() {
 
   const getStatusText = (s?: ReflectionStatus) => {
     switch (s) {
-      case ReflectionStatus.PENDING:     return "Chờ xác minh";
-      case ReflectionStatus.VERIFIED:    return "Đã xác minh";
-      case ReflectionStatus.ASSIGNED:    return "Đã phân công";
-      case ReflectionStatus.IN_PROGRESS: return "Đang xử lý";
-      case ReflectionStatus.COMPLETED:   return "Chờ xác nhận";
-      case ReflectionStatus.RESOLVED:    return "Đã hoàn thành";
-      case ReflectionStatus.REJECTED:    return "Từ chối";
-      default:                           return "Mới";
+      case ReflectionStatus.PENDING:
+        return "Chờ xác minh";
+      case ReflectionStatus.VERIFIED:
+        return "Đã xác minh";
+      case ReflectionStatus.ASSIGNED:
+        return "Đã phân công";
+      case ReflectionStatus.IN_PROGRESS:
+        return "Đang xử lý";
+      case ReflectionStatus.COMPLETED:
+        return "Chờ xác nhận";
+      case ReflectionStatus.RESOLVED:
+        return "Đã hoàn thành";
+      case ReflectionStatus.REJECTED:
+        return "Từ chối";
+      default:
+        return "Mới";
     }
   };
 
@@ -339,13 +369,13 @@ export default function ListReflection() {
 
   const getStatusTag = (status?: ReflectionStatus) => {
     const cfg: Record<string, { color: string; label: string }> = {
-      PENDING:     { color: "orange",   label: "Chờ xác minh" },
-      VERIFIED:    { color: "blue",     label: "Đã xác minh" },
-      ASSIGNED:    { color: "purple",   label: "Đã phân công" },
+      PENDING: { color: "orange", label: "Chờ xác minh" },
+      VERIFIED: { color: "blue", label: "Đã xác minh" },
+      ASSIGNED: { color: "purple", label: "Đã phân công" },
       IN_PROGRESS: { color: "geekblue", label: "Đang xử lý" },
-      COMPLETED:   { color: "cyan",     label: "Chờ xác nhận" },
-      RESOLVED:    { color: "green",    label: "Đã hoàn thành" },
-      REJECTED:    { color: "red",      label: "Từ chối" },
+      COMPLETED: { color: "cyan", label: "Chờ xác nhận" },
+      RESOLVED: { color: "green", label: "Đã hoàn thành" },
+      REJECTED: { color: "red", label: "Từ chối" },
     };
     const c = cfg[status ?? ""] ?? { color: "default", label: "Mới" };
     return <Tag color={c.color}>{c.label}</Tag>;
@@ -514,7 +544,7 @@ export default function ListReflection() {
       ),
     },
     {
-      width: 220,
+      width: isMobile ? 140 : 220,
       fixed: "right",
       title: (
         <span className="text-[#ACACAC] lg:text-[16px] text-[14px] flex justify-center">
@@ -531,69 +561,47 @@ export default function ListReflection() {
             <Dropdown
               menu={{
                 items: [
-                  {
-                    key: "edit",
-                    disabled:
-                      record?.status === ReflectionStatus.RESOLVED && !isAdmin,
-                    label: (
-                      <div
-                        onClick={() => {
-                          if (
-                            record?.status !== ReflectionStatus.RESOLVED ||
-                            isAdmin
-                          ) {
-                            navigate(
-                              `/app/reflection-manager/edit/${record?.id}`,
-                            );
-                          }
-                        }}
-                        className={`text-[16px] flex items-center gap-2 ${record?.status === ReflectionStatus.RESOLVED && !isAdmin ? "text-gray-400 cursor-not-allowed" : "text-blue-500 cursor-pointer"}`}
-                      >
-                        <Pencil size={16} /> Sửa
-                      </div>
-                    ),
-                  },
-                  // Nút xem chi tiết — thực hiện workflow tại đó
-                  ...((
-                    (record?.status === ReflectionStatus.PENDING && roleCode === "OFFICER") ||
-                    ((record?.status === ReflectionStatus.PENDING || record?.status === ReflectionStatus.VERIFIED) && (isManager || isAdmin)) ||
-                    (record?.status === ReflectionStatus.ASSIGNED && (roleCode === "INSPECTOR" || isManager)) ||
-                    (record?.status === ReflectionStatus.IN_PROGRESS && roleCode === "PATROL") ||
-                    (record?.status === ReflectionStatus.COMPLETED && (roleCode === "INSPECTOR" || isManager))
-                  ) ? [
-                    {
-                      key: "action",
-                      label: (
-                        <div
-                          onClick={() => navigate(`/app/reflection-manager/detail/${record?.id}`)}
-                          className="text-[16px] flex items-center gap-2 text-purple-600 cursor-pointer font-semibold"
-                        >
-                          <CheckCheck size={16} /> Thực hiện hành động
-                        </div>
-                      ),
-                    },
-                  ] : []),
-                  {
-                    key: "delete",
-                    disabled:
-                      record?.status === ReflectionStatus.RESOLVED && !isAdmin,
-                    label: (
-                      <div
-                        onClick={() => {
-                          if (
-                            record?.status !== ReflectionStatus.RESOLVED ||
-                            isAdmin
-                          ) {
-                            setIsOpenModalDelete(true);
-                            setIdDelete(record?.id as number);
-                          }
-                        }}
-                        className={`text-[16px] flex items-center gap-2 ${record?.status === ReflectionStatus.RESOLVED && !isAdmin ? "text-gray-400 cursor-not-allowed" : "text-red-500 cursor-pointer"}`}
-                      >
-                        <Trash size={16} /> Xóa
-                      </div>
-                    ),
-                  },
+                  ...(record?.status === ReflectionStatus.PENDING &&
+                  (record?.user?.id === profileData?.id ||
+                    (record as any)?.userId === profileData?.id)
+                    ? [
+                        {
+                          key: "edit",
+                          label: (
+                            <div
+                              onClick={() => {
+                                navigate(
+                                  `/app/reflection-manager/edit/${record?.id}`,
+                                );
+                              }}
+                              className="text-[16px] flex items-center gap-2 text-blue-500 cursor-pointer"
+                            >
+                              <Pencil size={16} /> Sửa
+                            </div>
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...(record?.status === ReflectionStatus.PENDING &&
+                  (record?.user?.id === profileData?.id ||
+                    (record as any)?.userId === profileData?.id)
+                    ? [
+                        {
+                          key: "delete",
+                          label: (
+                            <div
+                              onClick={() => {
+                                setIsOpenModalDelete(true);
+                                setIdDelete(record?.id as number);
+                              }}
+                              className="text-[16px] flex items-center gap-2 text-red-500 cursor-pointer"
+                            >
+                              <Trash size={16} /> Xóa
+                            </div>
+                          ),
+                        },
+                      ]
+                    : []),
                   {
                     key: "detail",
                     label: (
@@ -624,45 +632,6 @@ export default function ListReflection() {
 
   return (
     <>
-      <Drawer
-        title="Lọc phản ánh / sự kiện"
-        closable={{ "aria-label": "Close Button" }}
-        onClose={() => setOpenFilter(false)}
-        open={openFilter}
-      >
-        <div className="flex flex-col gap-4">
-          <Select
-            placeholder="Danh mục"
-            className="w-full h-8!"
-            allowClear
-            value={category}
-            onChange={(value) => setCategory(value)}
-            options={[
-              { value: Category.INFRASTRUCTURE, label: "Hạ tầng" },
-              { value: Category.ENVIRONMENT, label: "Môi trường" },
-              { value: Category.SECURITY, label: "An ninh trật tự" },
-              { value: Category.OTHER, label: "Khác" },
-            ]}
-          />
-          <Select
-            placeholder="Trạng thái"
-            className="w-full h-8!"
-            allowClear
-            value={status}
-            onChange={(value) => setStatus(value)}
-            options={[
-              { value: ReflectionStatus.PENDING,     label: "Chờ xác minh" },
-              { value: ReflectionStatus.VERIFIED,    label: "Đã xác minh" },
-              { value: ReflectionStatus.ASSIGNED,    label: "Đã phân công" },
-              { value: ReflectionStatus.IN_PROGRESS, label: "Đang xử lý" },
-              { value: ReflectionStatus.COMPLETED,   label: "Chờ xác nhận" },
-              { value: ReflectionStatus.RESOLVED,    label: "Đã hoàn thành" },
-              { value: ReflectionStatus.REJECTED,    label: "Từ chối" },
-            ]}
-          />
-        </div>
-      </Drawer>
-
       {/* Modal xoa */}
       <Modal
         centered
@@ -727,53 +696,37 @@ export default function ListReflection() {
                 <>
                   <Button
                     onClick={handleExportExcelRF}
-                    className="text-[16px] font-medium h-9! border-green-600 text-green-600 hover:bg-green-50"
+                    className="fd-btn-outline-green"
                   >
                     <FileSpreadsheet size={16} /> Xuất Excel
                   </Button>
                   <Button
                     onClick={handleExportWordRF}
-                    className="text-[16px] font-medium h-9! border-blue-600 text-blue-600 hover:bg-blue-50"
+                    className="fd-btn-outline-blue"
                   >
                     <FileText size={16} /> Xuất Word
                   </Button>
                 </>
               )}
-              <Button
-                onClick={() => navigate("/app/reflection-manager/create")}
-                type="primary"
-                className="text-[16px] w-full md:w-auto font-medium h-9!"
-              >
-                + Đăng phản ánh
-              </Button>
+              {(isAdmin ||
+                isManager ||
+                profileData?.role?.roleCode === Role.RESIDENT) && (
+                <Button
+                  onClick={() => navigate("/app/reflection-manager/create")}
+                  type="primary"
+                  className="text-[16px] w-full md:w-auto font-medium h-9!"
+                >
+                  + Thêm phản ánh
+                </Button>
+              )}
             </div>
           </div>
-          <div className="flex flex-col md:flex-row md:items-center gap-3 justify-between mb-4">
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <Button
-                onClick={() => setOpenFilter(true)}
-                type="primary"
-                className="text-[16px] w-full md:w-auto font-medium h-9!"
-              >
-                Lọc <Filter size={16} className="cursor-pointer" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <Input
-                value={keyword}
-                onChange={handleSearch}
-                className="w-full md:w-[300px]! h-9!"
-                prefix={<Search className="text-[#ACACAC]" size={14} />}
-                placeholder="Tìm kiếm theo tiêu đề, mô tả, ..."
-              />
-              <Tooltip placement="bottom" title="Tải lại" arrow={false}>
-                <RefreshCw
-                  onClick={() => refetch()}
-                  size={20}
-                  className={`cursor-pointer ${isLoading ? "animate-spin text-blue-500" : ""}`}
-                />
-              </Tooltip>
-            </div>
+          <div className="mb-4">
+            <ReflectionFilter
+              onFilter={handleFilter}
+              onRefresh={() => refetch()}
+              loading={isLoading}
+            />
           </div>
           {isLoading ? (
             <div className="flex justify-center items-center h-64">

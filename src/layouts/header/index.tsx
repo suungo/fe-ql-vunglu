@@ -91,6 +91,16 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     return () => window.clearInterval(t);
   }, []);
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
   const fetchUnreadCount = useCallback(async () => {
     try {
       const token = localStorage.getItem("accessToken");
@@ -139,6 +149,9 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     VERIFICATION_REJECTED: "Yêu cầu xác minh đã bị từ chối",
     VERIFICATION_COMPLETED: "Yêu cầu xác minh đã hoàn thành",
     EMERGENCY_CHAT: "Hỗ trợ khẩn cấp",
+    FLOOD_DAMAGE_NEW: "Báo cáo thiệt hại mới",
+    FLOOD_DAMAGE_UPDATE: "Cập nhật thiệt hại",
+    DISPATCH_REMINDER: "Nhắc nhở nhiệm vụ",
   };
   const handleNotificationClick = async (item: Notification) => {
     // 1. Mark as read
@@ -166,14 +179,12 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     if (item.type === "EMERGENCY_CHAT") {
       navigate(`/messages-realtime`);
     } else if (
-      item.type === "NEW_REFLECTION" ||
-      item.type === "NEARBY_REFLECTION"
+      item.type === "FLOOD_DAMAGE_NEW" ||
+      item.type === "FLOOD_DAMAGE_UPDATE"
     ) {
-      if (item.referenceId) {
-        navigate(`/app/reflection-manager/detail/${item.referenceId}`);
-      } else {
-        navigate(`/app/reflection-manager/list`);
-      }
+      navigate(`/app/flood-damages-manager/detail/${item.referenceId}`);
+    } else if (item.referenceId) {
+      navigate(`/app/reflection-manager/detail/${item.referenceId}`);
     } else {
       navigate(`/app/reflection-manager/list`);
     }
@@ -302,130 +313,225 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         console.log("Connected to notification socket");
       });
 
-      socket.on("newNotification", (notification: Notification) => {
-        setNotifications((prev) => [notification, ...prev]);
-        setAlertsCount((prev) => (prev || 0) + 1);
+      socket.on(
+        "newNotification",
+        (notification: Notification & { actorId?: number }) => {
+          setNotifications((prev) => [notification, ...prev]);
+          setAlertsCount((prev) => (prev || 0) + 1);
 
-        // Tự động làm mới danh sách nhân sự khi nhận thông báo liên quan
-        if (
-          notification.type === "VERIFICATION_APPROVED" ||
-          notification.type === "VERIFICATION_COMPLETED" ||
-          notification.type === "VERIFICATION_REJECTED" ||
-          notification.title?.toLowerCase().includes("nhân sự") ||
-          notification.content?.toLowerCase().includes("nhân sự")
-        ) {
-          queryClient.invalidateQueries({ queryKey: ["human-resources"] });
-          queryClient.invalidateQueries({ queryKey: ["hr-verification-history"] });
-        }
-
-        // Phân loại thông báo để hiển thị style đẹp mắt, chuyên nghiệp hơn
-        let iconElement = <Bell className="text-blue-500" size={20} />;
-        let borderLeftColor = '#1a5d9f'; // Màu xanh thương hiệu mặc định
-        let badgeText = 'Hệ thống';
-        let badgeBg = '#f0f7ff';
-        let badgeTextColor = '#0369a1';
-
-        switch (notification.type) {
-          case 'VERIFICATION_APPROVED':
-          case 'VERIFICATION_COMPLETED':
-            iconElement = <CheckCircle2 className="text-emerald-500" size={20} />;
-            borderLeftColor = '#10b981'; // Emerald 500
-            badgeText = 'Đã duyệt';
-            badgeBg = '#ecfdf5';
-            badgeTextColor = '#047857';
-            break;
-          case 'VERIFICATION_REJECTED':
-            iconElement = <XCircle className="text-rose-500" size={20} />;
-            borderLeftColor = '#f43f5e'; // Rose 500
-            badgeText = 'Từ chối';
-            badgeBg = '#fff1f2';
-            badgeTextColor = '#be123c';
-            break;
-          case 'NEW_REFLECTION':
-          case 'NEARBY_REFLECTION':
-            iconElement = <AlertTriangle className="text-amber-500" size={20} />;
-            borderLeftColor = '#f59e0b'; // Amber 500
-            badgeText = 'Phản ánh mới';
-            badgeBg = '#fffbeb';
-            badgeTextColor = '#b45309';
-            break;
-          case 'EMERGENCY_CHAT':
-            iconElement = <MessageSquare className="text-red-500 animate-pulse" size={20} />;
-            borderLeftColor = '#ef4444'; // Red 500
-            badgeText = 'Khẩn cấp';
-            badgeBg = '#fef2f2';
-            badgeTextColor = '#b91c1c';
-            break;
-          default:
-            iconElement = <Bell className="text-[#1a5d9f]" size={20} />;
-            borderLeftColor = '#1a5d9f';
-            badgeText = 'Thông báo';
-            badgeBg = '#f8fafc';
-            badgeTextColor = '#475569';
-        }
-
-        // Hiển thị thông báo nổi ở góc màn hình (Premium Rich Notification Card)
-        antdNotification.open({
-          message: (
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span 
-                  className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider" 
-                  style={{ backgroundColor: badgeBg, color: badgeTextColor }}
-                >
-                  {badgeText}
-                </span>
-                <span className="text-[10px] text-gray-400 font-medium">
-                  {new Date().toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-              <span className="font-bold text-[14px] text-slate-800 leading-snug mt-1">
-                {notification.title}
-              </span>
-            </div>
-          ),
-          description: (
-            <div className="text-[12.5px] text-slate-600 mt-2 leading-relaxed font-medium">
-              {notification.content}
-              <div className="mt-3 flex items-center justify-end text-xs font-semibold text-[#1a5d9f] hover:text-[#1b75c8] gap-1 transition-colors">
-                <span>Xem chi tiết</span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </div>
-          ),
-          placement: "topRight",
-          icon: <div className="p-2 rounded-xl bg-slate-50 flex items-center justify-center border border-slate-100">{iconElement}</div>,
-          duration: 10,
-          style: {
-            borderRadius: 16,
-            boxShadow: '0 20px 40px rgba(13, 47, 86, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)',
-            border: '1px solid #eef2f6',
-            borderLeft: `4px solid ${borderLeftColor}`,
-            backgroundColor: '#ffffff',
-            cursor: 'pointer',
-            padding: '16px 20px',
-            width: '380px',
-          },
-          onClick: () => {
-            if (notification.type === "EMERGENCY_CHAT") {
-              navigate("/messages-realtime");
-            } else if (
-              notification.type === "NEW_REFLECTION" ||
-              notification.type === "NEARBY_REFLECTION"
-            ) {
-              if (notification.referenceId) {
-                navigate(`/app/reflection-manager/detail/${notification.referenceId}`);
-              } else {
-                navigate(`/app/reflection-manager/list`);
-              }
-            } else {
-              setSelectedNotification(notification);
-            }
+          // Tự động làm mới danh sách nhân sự khi nhận thông báo liên quan
+          if (
+            notification.type === "VERIFICATION_APPROVED" ||
+            notification.type === "VERIFICATION_COMPLETED" ||
+            notification.type === "VERIFICATION_REJECTED" ||
+            notification.title?.toLowerCase().includes("nhân sự") ||
+            notification.content?.toLowerCase().includes("nhân sự")
+          ) {
+            queryClient.invalidateQueries({ queryKey: ["human-resources"] });
+            queryClient.invalidateQueries({
+              queryKey: ["hr-verification-history"],
+            });
           }
-        });
-      });
+
+          // Tự động làm mới danh sách phản ánh & chi tiết phản ánh
+          if (
+            notification.type === "NEW_REFLECTION" ||
+            notification.type === "VERIFICATION_APPROVED" ||
+            notification.type === "VERIFICATION_REJECTED" ||
+            notification.type === "VERIFICATION_COMPLETED" ||
+            notification.type === "VERIFICATION_REQUEST" ||
+            notification.type?.startsWith("PATROL_") ||
+            notification.type?.startsWith("DISPATCH_") ||
+            notification.title?.toLowerCase().includes("phản ánh") ||
+            notification.content?.toLowerCase().includes("phản ánh") ||
+            notification.title?.toLowerCase().includes("xác minh") ||
+            notification.content?.toLowerCase().includes("xác minh") ||
+            notification.title?.toLowerCase().includes("tuần tra") ||
+            notification.content?.toLowerCase().includes("tuần tra") ||
+            notification.title?.toLowerCase().includes("điều chuyển") ||
+            notification.content?.toLowerCase().includes("điều chuyển")
+          ) {
+            queryClient.invalidateQueries({ queryKey: ["reflections"] });
+            queryClient.invalidateQueries({ queryKey: ["reflection"] });
+            queryClient.invalidateQueries({ queryKey: ["verifications"] });
+            queryClient.invalidateQueries({ queryKey: ["verification"] });
+            queryClient.invalidateQueries({
+              queryKey: ["resolvedReflections"],
+            });
+          }
+
+          // Tự động làm mới danh sách điều phối / yêu cầu
+          if (
+            notification.type?.startsWith("DISPATCH_") ||
+            notification.type?.startsWith("PATROL_") ||
+            notification.title?.toLowerCase().includes("điều chuyển") ||
+            notification.content?.toLowerCase().includes("điều chuyển") ||
+            notification.title?.toLowerCase().includes("yêu cầu") ||
+            notification.content?.toLowerCase().includes("yêu cầu") ||
+            notification.title?.toLowerCase().includes("tuần tra") ||
+            notification.content?.toLowerCase().includes("tuần tra")
+          ) {
+            queryClient.invalidateQueries({ queryKey: ["dispatch-reports"] });
+            queryClient.invalidateQueries({ queryKey: ["dispatch-report"] });
+            queryClient.invalidateQueries({
+              queryKey: ["verified-reflections"],
+            });
+          }
+
+          // Kiểm tra nếu người tạo thông báo chính là user hiện tại thì không hiển thị toast push notification card
+          const currentUserStr = localStorage.getItem("user");
+          const currentUser = currentUserStr
+            ? JSON.parse(currentUserStr)
+            : null;
+          if (
+            notification.actorId &&
+            currentUser &&
+            notification.actorId === currentUser.id
+          ) {
+            return;
+          }
+
+          // Phân loại thông báo để hiển thị style đẹp mắt, chuyên nghiệp hơn
+          let iconElement = <Bell className="text-blue-500" size={20} />;
+          let borderLeftColor = "#1a5d9f"; // Màu xanh thương hiệu mặc định
+          let badgeText = "Hệ thống";
+          let badgeBg = "#f0f7ff";
+          let badgeTextColor = "#0369a1";
+
+          switch (notification.type) {
+            case "VERIFICATION_APPROVED":
+            case "VERIFICATION_COMPLETED":
+              iconElement = (
+                <CheckCircle2 className="text-emerald-500" size={20} />
+              );
+              borderLeftColor = "#10b981"; // Emerald 500
+              badgeText = "Đã duyệt";
+              badgeBg = "#ecfdf5";
+              badgeTextColor = "#047857";
+              break;
+            case "VERIFICATION_REJECTED":
+              iconElement = <XCircle className="text-rose-500" size={20} />;
+              borderLeftColor = "#f43f5e"; // Rose 500
+              badgeText = "Từ chối";
+              badgeBg = "#fff1f2";
+              badgeTextColor = "#be123c";
+              break;
+            case "NEW_REFLECTION":
+            case "NEARBY_REFLECTION":
+              iconElement = (
+                <AlertTriangle className="text-amber-500" size={20} />
+              );
+              borderLeftColor = "#f59e0b"; // Amber 500
+              badgeText = "Phản ánh mới";
+              badgeBg = "#fffbeb";
+              badgeTextColor = "#b45309";
+              break;
+            case "EMERGENCY_CHAT":
+              iconElement = (
+                <MessageSquare
+                  className="text-red-500 animate-pulse"
+                  size={20}
+                />
+              );
+              borderLeftColor = "#ef4444"; // Red 500
+              badgeText = "Khẩn cấp";
+              badgeBg = "#fef2f2";
+              badgeTextColor = "#b91c1c";
+              break;
+            default:
+              iconElement = <Bell className="text-[#1a5d9f]" size={20} />;
+              borderLeftColor = "#1a5d9f";
+              badgeText = "Thông báo";
+              badgeBg = "#f8fafc";
+              badgeTextColor = "#475569";
+          }
+
+          // Hiển thị thông báo nổi ở góc màn hình (Premium Rich Notification Card)
+          antdNotification.open({
+            message: (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
+                    style={{ backgroundColor: badgeBg, color: badgeTextColor }}
+                  >
+                    {badgeText}
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-medium">
+                    {new Date().toLocaleTimeString("vi-VN", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false,
+                      timeZone: "Asia/Ho_Chi_Minh",
+                    })}
+                  </span>
+                </div>
+                <span className="font-bold text-[14px] text-slate-800 leading-snug mt-1">
+                  {notification.title}
+                </span>
+              </div>
+            ),
+            description: (
+              <div className="text-[12.5px] text-slate-600 mt-2 leading-relaxed font-medium">
+                {notification.content}
+                <div className="mt-3 flex items-center justify-end text-xs font-semibold text-[#1a5d9f] hover:text-[#1b75c8] gap-1 transition-colors">
+                  <span>Xem chi tiết</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-3 w-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </div>
+              </div>
+            ),
+            placement: "topRight",
+            icon: (
+              <div className="p-2 rounded-xl bg-slate-50 flex items-center justify-center border border-slate-100">
+                {iconElement}
+              </div>
+            ),
+            duration: 10,
+            style: {
+              borderRadius: 16,
+              boxShadow:
+                "0 20px 40px rgba(13, 47, 86, 0.08), 0 1px 3px rgba(0, 0, 0, 0.02)",
+              border: "1px solid #eef2f6",
+              borderLeft: `4px solid ${borderLeftColor}`,
+              backgroundColor: "#ffffff",
+              cursor: "pointer",
+              padding: "16px 20px",
+              width: "380px",
+            },
+            onClick: () => {
+              if (notification.type === "EMERGENCY_CHAT") {
+                navigate("/messages-realtime");
+              } else if (
+                notification.type === "FLOOD_DAMAGE_NEW" ||
+                notification.type === "FLOOD_DAMAGE_UPDATE"
+              ) {
+                navigate(
+                  `/app/flood-damages-manager/detail/${notification.referenceId}`,
+                );
+              } else if (notification.referenceId) {
+                navigate(
+                  `/app/reflection-manager/detail/${notification.referenceId}`,
+                );
+              } else {
+                setSelectedNotification(notification);
+              }
+            },
+          });
+        },
+      );
 
       socket.on("connect_error", (error: Error) => {
         console.error("Socket connection error:", error);
@@ -439,10 +545,11 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     };
   }, [fetchUnreadCount, queryClient]);
 
-  const time = now.toLocaleTimeString("en-US", {
+  const time = now.toLocaleTimeString("vi-VN", {
     hour: "2-digit",
     minute: "2-digit",
-    hour12: true,
+    hour12: false,
+    timeZone: "Asia/Ho_Chi_Minh",
   });
   const date = now.toLocaleDateString("vi-VN", {
     day: "2-digit",
@@ -453,16 +560,20 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   // Dropwdown menu items
   const dropdownItems: MenuProps["items"] = useMemo(
     () => [
-      {
-        label: (
-          <div className="flex items-center gap-2 p-2">
-            <UserRound size={18} className="text-gray-700" />
-            <span>Thông tin cá nhân</span>
-          </div>
-        ),
-        key: "profile",
-        onClick: () => navigate("/app/profile-manager/detail"),
-      },
+      ...(!isMobile
+        ? [
+            {
+              label: (
+                <div className="flex items-center gap-2 p-2">
+                  <UserRound size={18} className="text-gray-700" />
+                  <span>Thông tin cá nhân</span>
+                </div>
+              ),
+              key: "profile",
+              onClick: () => navigate("/app/profile-manager/detail"),
+            },
+          ]
+        : []),
       {
         label: (
           <div
@@ -489,7 +600,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
         key: "logout",
       },
     ],
-    [navigate],
+    [navigate, isMobile],
   );
 
   return (
@@ -659,7 +770,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
           </div>
         )}
       </Modal>
-      <header className="sticky top-0 z-1000 flex h-16 items-center justify-between bg-[linear-gradient(90deg,#1a5d9f_0%,#1b75c8_100%)] px-3 md:px-6 text-white shadow-lg">
+      <header className="sticky top-0 z-1999 flex h-16 items-center justify-between bg-[linear-gradient(90deg,#1a5d9f_0%,#1b75c8_100%)] px-3 md:px-6 text-white shadow-lg">
         <div className="flex items-center gap-2 md:gap-4 xl:gap-6">
           {/* Hamburger button cho mobile */}
           {onMenuToggle && (

@@ -7,7 +7,6 @@ export enum HumanResourcesStatus {
 export enum HumanResourcesPosition {
   OFFICER = "OFFICER", // Cán bộ tăng cường
   STAFF = "STAFF", // Nhân viên y tế
-  POSTOFFICER = "POSTOFFICER", // Cán bộ hậu kiểm
   ELECTRICITYSTAFF = "ELECTRICITYSTAFF", // Nhân viên điện lực
   PATROL = "PATROL", // Cán bộ tuần tra
 }

@@ -10,10 +10,10 @@ export const SelectHumanResourcesPosition = [
     value: HumanResourcesPosition.STAFF,
     label: "Nhân viên y tế",
   },
-  {
-    value: HumanResourcesPosition.POSTOFFICER,
-    label: "Cán bộ hậu kiểm",
-  },
+  // {
+  //   value: HumanResourcesPosition.POSTOFFICER,
+  //   label: "Cán bộ hậu kiểm",
+  // },
   {
     value: HumanResourcesPosition.ELECTRICITYSTAFF,
     label: "Nhân viên điện lực",

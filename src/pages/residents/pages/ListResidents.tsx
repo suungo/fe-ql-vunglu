@@ -1,34 +1,30 @@
-import useDebounce from "@/hooks/useDebounce";
 import useStyle from "@/interfaces/useStyle";
+import "../../floodDamages/styles/floodDamages.css";
 import {
   Button,
-  Drawer,
   Dropdown,
   Empty,
-  Input,
   Modal,
   notification,
-  Select,
-  Spin,
   Table,
   Tooltip,
+  Tabs,
 } from "antd";
 import type { ColumnType } from "antd/es/table";
 import { AxiosError } from "axios";
 import {
   EllipsisVertical,
   Eye,
-  Filter,
   Pencil,
-  RefreshCw,
-  Search,
   Trash,
   X,
   FileSpreadsheet,
   FileText,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { getResidentContacts, deleteResidentContact } from "../../residentContacts/apis";
 import { HouseTypeLabel } from "../constants";
 import {
   HasBusiness,
@@ -42,103 +38,74 @@ import { useDeleteResident, useResidents } from "../hooks";
 import type { Resident } from "../interfaces";
 import { exportToExcel, exportToWord } from "@/utils/exportUtils";
 import { Role } from "@/enums";
+import ResidentFilter, {
+  type ResidentFilterParams,
+} from "../components/ResidentFilter";
+import ResidentWithAccountTab from "../components/ResidentWithAccountTab";
+import ResidentPendingApprovalTab from "../components/ResidentPendingApprovalTab";
+import ResidentRejectedTab from "../components/ResidentRejectedTab";
 
 export default function ListResidents() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { styles } = useStyle();
-  const [houseType, setHouseType] = useState<HouseType | undefined>(
-    (searchParams.get("houseType") as HouseType) || undefined,
-  );
-  const [hasChildren, setHasChildren] = useState<HasChildren | undefined>(
-    (searchParams.get("hasChildren") as HasChildren) || undefined,
-  );
-  const [hasBusiness, setHasBusiness] = useState<HasBusiness | undefined>(
-    (searchParams.get("hasBusiness") as HasBusiness) || undefined,
-  );
-  const [hasChronicDisease, setHasChronicDisease] = useState<
-    HasSick | undefined
-  >((searchParams.get("hasChronicDisease") as HasSick) || undefined);
-  const [hasElderly, setHasElderly] = useState<HasElderly | undefined>(
-    (searchParams.get("hasElderly") as HasElderly) || undefined,
-  );
-  const [hasPregnantWomen, setHasPregnantWomen] = useState<
-    HasPregnant | undefined
-  >((searchParams.get("hasPregnantWomen") as HasPregnant) || undefined);
-  // Lấy keyword từ URL khi vào trang hoặc refresh
-  const keywordFromUrl = searchParams.get("keyword") || "";
+
   const [id, setId] = useState<number | null>(null);
-  const [keyword, setKeyword] = useState(keywordFromUrl);
-  const [page, setPage] = useState<number>(
-    Number(searchParams.get("page")) || 1,
-  );
-  const [limit, setLimit] = useState<number>(
-    Number(searchParams.get("limit")) || 10,
-  );
+  const [page, setPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(10);
   const [isOpenModalDelete, setIsOpenModalDelete] = useState(false);
-  const [open, setOpen] = useState(false);
-  const showDrawer = () => {
-    setOpen(true);
-  };
+  const [filterParams, setFilterParams] = useState<ResidentFilterParams>({});
+  const [activeTab, setActiveTab] = useState<string>("all");
 
-  const onClose = () => {
-    setOpen(false);
-  };
+  // Gọi API lấy thông tin liên hệ từ Excel
+  const {
+    data: contactData,
+    isLoading: isContactsLoading,
+    refetch: refetchContacts,
+  } = useQuery({
+    queryKey: ["resident-contacts", page, limit, filterParams.keyword],
+    queryFn: () =>
+      getResidentContacts({
+        page: page,
+        limit: limit,
+        keyword: filterParams.keyword,
+      }),
+    enabled: activeTab === "all",
+  });
 
-  // Debounce keyword
-  const debouncedKeyword = useDebounce(keyword, 500);
-
-  // ==================== CẬP NHẬT URL KHI DEBOUNCE HOẶC PHÂN TRANG THAY ĐỔI ====================
-  useEffect(() => {
-    const params = new URLSearchParams();
-
-    if (debouncedKeyword.trim()) {
-      params.set("keyword", debouncedKeyword.trim());
-    }
-    if (page > 1) params.set("page", page.toString());
-    if (limit !== 10) params.set("limit", limit.toString());
-    if (houseType) params.set("houseType", houseType);
-    if (hasChildren) params.set("hasChildren", hasChildren);
-    if (hasBusiness) params.set("hasBusiness", hasBusiness);
-    if (hasChronicDisease) params.set("hasChronicDisease", hasChronicDisease);
-    if (hasElderly) params.set("hasElderly", hasElderly);
-    if (hasPregnantWomen) params.set("hasPregnantWomen", hasPregnantWomen);
-    setSearchParams(params, { replace: true });
-  }, [
-    debouncedKeyword,
-    page,
-    limit,
-    houseType,
-    hasChildren,
-    hasBusiness,
-    hasChronicDisease,
-    hasElderly,
-    hasPregnantWomen,
-    setSearchParams,
-  ]);
-
-  // Gọi API (hook của bạn)
+  // Gọi API danh sách hộ dân gốc
   const {
     data: ListResidents,
     isLoading,
     refetch,
   } = useResidents({
-    keyword: debouncedKeyword,
+    keyword: filterParams.keyword,
     limit,
     page,
-    hasChildren: hasChildren as HasChildren,
-    hasBusiness: hasBusiness as HasBusiness,
-    hasChronicDisease: hasChronicDisease as HasSick,
-    hasElderly: hasElderly as HasElderly,
-    hasPregnantWomen: hasPregnantWomen as HasPregnant,
-    houseType: houseType as HouseType,
+    hasChildren: filterParams.hasChildren as HasChildren,
+    hasBusiness: filterParams.hasBusiness as HasBusiness,
+    hasChronicDisease: filterParams.hasChronicDisease as HasSick,
+    hasElderly: filterParams.hasElderly as HasElderly,
+    hasPregnantWomen: filterParams.hasPregnantWomen as HasPregnant,
+    houseType: filterParams.houseType as HouseType,
   });
 
-  // Xử lý khi người dùng gõ tìm kiếm
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setKeyword(e.target.value);
-    setPage(1); // reset về trang 1 khi search
+  const handleFilter = (params: ResidentFilterParams) => {
+    setFilterParams(params);
+    setPage(1);
+    // Cập nhật URL params
+    const urlParams = new URLSearchParams();
+    if (params.keyword) urlParams.set("keyword", params.keyword);
+    if (params.houseType) urlParams.set("houseType", params.houseType);
+    if (params.hasElderly) urlParams.set("hasElderly", params.hasElderly);
+    if (params.hasChildren) urlParams.set("hasChildren", params.hasChildren);
+    if (params.hasPregnantWomen)
+      urlParams.set("hasPregnantWomen", params.hasPregnantWomen);
+    if (params.hasChronicDisease)
+      urlParams.set("hasChronicDisease", params.hasChronicDisease);
+    if (params.hasBusiness) urlParams.set("hasBusiness", params.hasBusiness);
+    setSearchParams(urlParams, { replace: true });
   };
 
   // Xử lý phân trang
@@ -150,13 +117,22 @@ export default function ListResidents() {
   const deleteResidentMutation = useDeleteResident();
   const handleDeleteResident = async (id: number) => {
     try {
-      const response = await deleteResidentMutation.mutateAsync(id);
+      let response;
+      if (activeTab === "all") {
+        response = await deleteResidentContact(id);
+      } else {
+        response = await deleteResidentMutation.mutateAsync(id);
+      }
       if (response?.statusCode === 200) {
         notification.success({
           title: "Thành công",
           description: response?.message,
         });
-        refetch();
+        if (activeTab === "all") {
+          refetchContacts();
+        } else {
+          refetch();
+        }
         setIsOpenModalDelete(false);
         setId(null);
       }
@@ -213,7 +189,8 @@ export default function ListResidents() {
       hasChildren: item.hasChildren === HasChildren.YES ? "Có" : "Không",
       hasPregnantWomen:
         item.hasPregnantWomen === HasPregnant.YES ? "Có" : "Không",
-      hasChronicDisease: item.hasChronicDisease === HasSick.YES ? "Có" : "Không",
+      hasChronicDisease:
+        item.hasChronicDisease === HasSick.YES ? "Có" : "Không",
       hasBusiness: item.hasBusiness === HasBusiness.YES ? "Có" : "Không",
       houseType: HouseTypeLabel[item.houseType],
     }));
@@ -235,39 +212,42 @@ export default function ListResidents() {
       return;
     }
     const dataToExport = formatExportData(ListResidents.data);
-    exportToWord(dataToExport, "Danh_Sach_Ho_Dan", HEADER_MAP, "DANH SÁCH HỘ DÂN", WORD_COL_WIDTHS);
+    exportToWord(
+      dataToExport,
+      "Danh_Sach_Ho_Dan",
+      HEADER_MAP,
+      "DANH SÁCH HỘ DÂN",
+      WORD_COL_WIDTHS,
+    );
     notification.success({ message: "Xuất file Word thành công" });
   };
 
-  const columns: ColumnType<Resident>[] = [
+  const columns: ColumnType<any>[] = [
     {
       width: 150,
       title: (
-        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
-          Mã hộ dân
-        </span>
+        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">ID</span>
       ),
-      dataIndex: "residentCode",
-
-      key: "residentCode",
+      dataIndex: activeTab === "all" ? "id" : "residentCode",
+      key: "id",
       render: (text: string) => (
-        <span className="text-[#000000] lg:text-[16px] text-[14px]">
+        <span className="text-[#000000] lg:text-[16px] text-[14px] font-semibold">
           {text}
         </span>
       ),
     },
     {
-      width: 200,
+      width: 220,
       title: (
         <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
-          Tên chủ hộ
+          Email (Địa chỉ thư điện tử)
         </span>
       ),
-      dataIndex: "fullName",
-      key: "fullName",
+      dataIndex: "email",
+      key: "email",
       render: (text: string) => (
         <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {text}
+          {text || "—"}
         </span>
       ),
     },
@@ -282,230 +262,126 @@ export default function ListResidents() {
       key: "phoneNumber",
       render: (text: string) => (
         <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {text}
+          {text || "—"}
         </span>
       ),
     },
     {
-      width: 250,
-      title: (
-        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">Email</span>
-      ),
-      dataIndex: "email",
-      key: "email",
-      render: (text: string) => (
-        <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {text}
-        </span>
-      ),
-    },
-    {
-      width: 250,
+      width: 150,
       title: (
         <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
-          Địa chỉ
+          Số CCCD
+        </span>
+      ),
+      dataIndex: "cccd",
+      key: "cccd",
+      render: (text: string) => (
+        <span className="text-[#000000] lg:text-[16px] text-[14px]">
+          {text || "—"}
+        </span>
+      ),
+    },
+    {
+      width: 300,
+      title: (
+        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
+          Địa chỉ liên hệ
         </span>
       ),
       dataIndex: "address",
       key: "address",
       render: (text: string) => (
         <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {text}
-        </span>
-      ),
-    },
-
-    {
-      width: 200,
-      title: (
-        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
-          Kinh độ - Vĩ độ
-        </span>
-      ),
-      key: "coordinates",
-      render: (_, record: Resident) => (
-        <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {record?.longitude} - {record?.latitude}
+          {text || "—"}
         </span>
       ),
     },
     {
-      width: 150,
-      title: (
-        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
-          Số thành viên
-        </span>
-      ),
-      dataIndex: "numberOfMembers",
-      key: "numberOfMembers",
-      render: (text: number) => (
-        <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {text}
-        </span>
-      ),
-    },
-    {
-      width: 150,
-      title: (
-        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
-          Có người già
-        </span>
-      ),
-      dataIndex: "hasElderly",
-      key: "hasElderly",
-      render: (_, record: Resident) => (
-        <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {record?.hasElderly === HasElderly.YES ? "Có" : "Không"}
-        </span>
-      ),
-    },
-    {
-      width: 150,
-      title: (
-        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
-          Có trẻ em
-        </span>
-      ),
-      dataIndex: "hasChildren",
-      key: "hasChildren",
-      render: (_, record: Resident) => (
-        <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {record?.hasChildren === HasChildren.YES ? "Có" : "Không"}
-        </span>
-      ),
-    },
-    {
-      width: 150,
-      title: (
-        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
-          Có phụ nữ mang thai
-        </span>
-      ),
-      dataIndex: "hasPregnantWomen",
-      key: "hasPregnantWomen",
-      render: (_, record: Resident) => (
-        <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {record?.hasPregnantWomen === HasPregnant.YES ? "Có" : "Không"}
-        </span>
-      ),
-    },
-    {
-      width: 150,
-      title: (
-        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
-          Có người bị bệnh nền
-        </span>
-      ),
-      dataIndex: "hasChronicDisease",
-      key: "hasChronicDisease",
-      render: (_, record: Resident) => (
-        <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {record?.hasChronicDisease === HasSick.YES ? "Có" : "Không"}
-        </span>
-      ),
-    },
-    {
-      width: 150,
-      title: (
-        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
-          Loại nhà
-        </span>
-      ),
-      dataIndex: "houseType",
-      key: "houseType",
-      render: (text: HouseType) => (
-        <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {HouseTypeLabel[text]}
-        </span>
-      ),
-    },
-    {
-      width: 150,
-      title: (
-        <span className="text-[#ACACAC] lg:text-[16px] text-[14px]">
-          Số tầng
-        </span>
-      ),
-      dataIndex: "numberOfFloors",
-      key: "numberOfFloors",
-      render: (text: number) => (
-        <span className="text-[#000000] lg:text-[16px] text-[14px]">
-          {text}
-        </span>
-      ),
-    },
-    {
-      width: 150,
+      width: 120,
       fixed: "right",
       title: (
         <span className="text-[#ACACAC] lg:text-[16px] text-[14px] flex justify-center">
-          Có kinh doanh
+          Hành động
         </span>
       ),
-      dataIndex: "hasBusiness",
-      key: "hasBusiness",
-      render: (_, record: Resident) => (
-        <div className="flex gap-2 justify-end">
-          <span className="text-[#000000] lg:text-[16px] text-[14px]">
-            {record?.hasBusiness === HasBusiness.YES ? "Có" : "Không"}
-          </span>
-          <span className="text-[#000000] lg:text-[16px] text-[14px]">
-            <Dropdown
-              menu={{
-                items: [
-                  {
-                    key: "edit",
-                    label: (
-                      <span
-                        onClick={() =>
-                          navigate(`/app/residents-manager/edit/${record?.id}`)
-                        }
-                        className="text-blue-500 text-[16px] cursor-pointer flex items-center gap-2"
-                      >
-                        {" "}
-                        <Pencil size={16} /> Sửa
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "delete",
-                    label: (
-                      <span
-                        onClick={() => {
-                          setIsOpenModalDelete(true);
-                          setId(record?.id);
-                        }}
-                        className="text-red-500 text-[16px] cursor-pointer flex items-center gap-2"
-                      >
-                        {" "}
-                        <Trash size={16} /> Xóa
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "detail",
-                    label: (
-                      <span
-                        onClick={() =>
-                          navigate(
-                            `/app/residents-manager/detail/${record?.id}`,
-                          )
-                        }
-                        className="text-[#000000] text-[16px] cursor-pointer flex items-center gap-2"
-                      >
-                        {" "}
-                        <Eye size={16} /> Chi tiết
-                      </span>
-                    ),
-                  },
-                ],
-              }}
-              placement="bottom"
-              arrow
-            >
-              <EllipsisVertical size={20} className="cursor-pointer" />
-            </Dropdown>
-          </span>
+      key: "actions",
+      render: (_, record: any) => (
+        <div className="flex justify-center">
+          <Dropdown
+            menu={{
+              items: [
+                ...(activeTab === "all"
+                  ? [
+                      {
+                        key: "delete",
+                        label: (
+                          <span
+                            onClick={() => {
+                              setIsOpenModalDelete(true);
+                              setId(record?.id);
+                            }}
+                            className="text-red-500 text-[16px] cursor-pointer flex items-center gap-2"
+                          >
+                            <Trash size={16} /> Xóa
+                          </span>
+                        ),
+                      },
+                    ]
+                  : [
+                      ...(user?.role?.roleCode === Role.ADMIN
+                        ? []
+                        : [
+                            {
+                              key: "edit",
+                              label: (
+                                <span
+                                  onClick={() =>
+                                    navigate(
+                                      `/app/residents-manager/edit/${record?.id}`,
+                                    )
+                                  }
+                                  className="text-blue-500 text-[16px] cursor-pointer flex items-center gap-2"
+                                >
+                                  <Pencil size={16} /> Sửa
+                                </span>
+                              ),
+                            },
+                            {
+                              key: "delete",
+                              label: (
+                                <span
+                                  onClick={() => {
+                                    setIsOpenModalDelete(true);
+                                    setId(record?.id);
+                                  }}
+                                  className="text-red-500 text-[16px] cursor-pointer flex items-center gap-2"
+                                >
+                                  <Trash size={16} /> Xóa
+                                </span>
+                              ),
+                            },
+                          ]),
+                      {
+                        key: "detail",
+                        label: (
+                          <span
+                            onClick={() =>
+                              navigate(`/app/residents-manager/detail/${record?.id}`)
+                            }
+                            className="text-[#000000] text-[16px] cursor-pointer flex items-center gap-2"
+                          >
+                            <Eye size={16} /> Chi tiết
+                          </span>
+                        ),
+                      },
+                    ]),
+              ],
+            }}
+            placement="bottom"
+            arrow
+          >
+            <EllipsisVertical size={20} className="cursor-pointer" />
+          </Dropdown>
         </div>
       ),
     },
@@ -513,138 +389,6 @@ export default function ListResidents() {
 
   return (
     <>
-      <Drawer
-        title="Lọc theo thông tin hộ dân"
-        closable={{ "aria-label": "Close Button" }}
-        onClose={onClose}
-        open={open}
-      >
-        <div className="flex flex-col gap-4">
-          <Select
-            placeholder="Chọn loại nhà"
-            className="w-full h-8!"
-            allowClear
-            value={houseType}
-            onChange={(value) => setHouseType(value)}
-            options={[
-              {
-                value: HouseType.HOUSE_LEVEL_4,
-                label: "Nhà cấp 4",
-              },
-              {
-                value: HouseType.HOUSE_STREET,
-                label: "Nhà phố (Nhà ống)",
-              },
-              {
-                value: HouseType.HOUSE_ALLEY,
-                label: "Nhà trong hẻm",
-              },
-              {
-                value: HouseType.HOUSE_FRONTAGE,
-                label: "Nhà mặt tiền",
-              },
-              {
-                value: HouseType.APARTMENT,
-                label: "Chung cư / căn hộ",
-              },
-              {
-                value: HouseType.RENTAL_HOUSE,
-                label: "Nhà trọ / phòng trọ",
-              },
-              {
-                value: HouseType.VILLA,
-                label: "Biệt thự / nhà liền kề",
-              },
-            ]}
-          />
-          <Select
-            placeholder="Chọn hộ có người già"
-            className="w-full h-8!"
-            allowClear
-            value={hasElderly}
-            onChange={(value) => setHasElderly(value)}
-            options={[
-              {
-                value: HasElderly.YES,
-                label: "Có",
-              },
-              {
-                value: HasElderly.NO,
-                label: "Không",
-              },
-            ]}
-          />
-          <Select
-            placeholder="Chọn hộ có trẻ em"
-            className="w-full h-8!"
-            allowClear
-            value={hasChildren}
-            onChange={(value) => setHasChildren(value)}
-            options={[
-              {
-                value: HasChildren.YES,
-                label: "Có",
-              },
-              {
-                value: HasChildren.NO,
-                label: "Không",
-              },
-            ]}
-          />
-          <Select
-            placeholder="Chọn hộ có phụ nữ mang thai"
-            className="w-full h-8!"
-            allowClear
-            value={hasPregnantWomen}
-            onChange={(value) => setHasPregnantWomen(value)}
-            options={[
-              {
-                value: HasPregnant.YES,
-                label: "Có",
-              },
-              {
-                value: HasPregnant.NO,
-                label: "Không",
-              },
-            ]}
-          />
-          <Select
-            placeholder="Chọn hộ có người bệnh nền"
-            className="w-full h-8!"
-            allowClear
-            value={hasChronicDisease}
-            onChange={(value) => setHasChronicDisease(value)}
-            options={[
-              {
-                value: HasSick.YES,
-                label: "Có",
-              },
-              {
-                value: HasSick.NO,
-                label: "Không",
-              },
-            ]}
-          />
-          <Select
-            placeholder="Chọn hộ có kinh doanh"
-            className="w-full h-8!"
-            allowClear
-            value={hasBusiness}
-            onChange={(value) => setHasBusiness(value)}
-            options={[
-              {
-                value: HasBusiness.YES,
-                label: "Có",
-              },
-              {
-                value: HasBusiness.NO,
-                label: "Không",
-              },
-            ]}
-          />
-        </div>
-      </Drawer>
-
       {/* Modal xóa hộ dân */}
       <Modal
         centered
@@ -695,103 +439,146 @@ export default function ListResidents() {
       </Modal>
       <div className="space-y-4">
         <div className="rounded-2xl bg-white/80 p-4 shadow-[0_20px_80px_-32px_rgba(15,23,42,0.4)] backdrop-blur">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="2xl:text-[26px] xl:text-[22px] text-[18px] font-semibold text-[#272727]">
-                Danh sách hộ dân
-              </div>
-            </div>
-            <div className="flex gap-2">
-              {(user?.role?.roleCode === Role.MANAGER || user?.role?.roleCode === Role.ADMIN) && (
-                <>
-                  <Button
-                    onClick={handleExportExcel}
-                    className="text-[16px] font-medium h-9! border-green-600 text-green-600 hover:bg-green-50"
-                  >
-                    <FileSpreadsheet size={16} /> Xuất Excel
-                  </Button>
-                  <Button
-                    onClick={handleExportWord}
-                    className="text-[16px] font-medium h-9! border-blue-600 text-blue-600 hover:bg-blue-50"
-                  >
-                    <FileText size={16} /> Xuất Word
-                  </Button>
-                </>
-              )}
-              <Button
-                onClick={() => {
-                  navigate("/app/residents-manager/create");
-                }}
-                type="primary"
-                className="text-[16px] font-medium h-9!"
-              >
-                + Thêm hộ dân
-              </Button>
-            </div>
+          <div className="2xl:text-[22px] xl:text-[20px] text-[18px] mb-4 font-semibold text-[#272727]">
+            Danh sách hộ dân
           </div>
-          <div className="flex items-center gap-2 justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={showDrawer}
-                type="primary"
-                className="text-[16px] font-medium h-9!"
-              >
-                Lọc <Filter size={16} className="cursor-pointer" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Input
-                value={keyword}
-                onChange={handleSearch}
-                className="w-[300px]! h-8!"
-                prefix={<Search className="text-[#ACACAC]" size={14} />}
-                placeholder="Tìm kiếm theo mã, tên hộ dân, ..."
-              />
-              <Tooltip placement="bottom" title="Tải lại" arrow={false}>
-                <RefreshCw
-                  onClick={() => refetch()}
-                  size={20}
-                  className="cursor-pointer"
-                />
-              </Tooltip>
-            </div>
-          </div>
-          {isLoading ? (
-            <div className="flex justify-center items-center h-64">
-              <Spin size="large" />
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-xl border border-slate-100 bg-white">
-              <Table
-                loading={isLoading}
-                dataSource={ListResidents?.data || []}
-                columns={columns as ColumnType<Resident>[]}
-                rowKey="id"
-                scroll={{ x: 1500 }}
-                locale={{
-                  emptyText: (
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description="Không có dữ liệu"
-                    />
-                  ),
-                }}
-                onRow={(record) => ({
-                  onDoubleClick: () =>
-                    navigate(`/app/residents-manager/detail/${record?.id}`),
-                })}
-                pagination={{
-                  current: page,
-                  pageSize: limit,
-                  total: ListResidents?.meta?.total || 0,
-                  showSizeChanger: true,
-                  pageSizeOptions: ["10", "20", "50", "100"],
-                  onChange: handlePaginationChange,
-                }}
-                className={styles?.customTable}
-              />
-            </div>
-          )}
+          <Tabs
+            defaultActiveKey="all"
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={[
+              {
+                key: "all",
+                label: (
+                  <span className="text-[16px] font-medium">
+                    Danh sách thông tin liên hệ
+                  </span>
+                ),
+                children: (
+                  <div>
+                    {/* Header */}
+                    <div className="mb-4 flex flex-wrap items-center justify-end gap-2 mt-4">
+                      <div className="flex gap-2 justify-end">
+                        {(user?.role?.roleCode === Role.MANAGER ||
+                          user?.role?.roleCode === Role.ADMIN) && (
+                          <>
+                            <Button
+                              onClick={handleExportExcel}
+                              className="fd-btn-outline-green"
+                            >
+                              <FileSpreadsheet size={16} /> Xuất Excel
+                            </Button>
+                            <Button
+                              onClick={handleExportWord}
+                              className="fd-btn-outline-blue"
+                            >
+                              <FileText size={16} /> Xuất Word
+                            </Button>
+                            <Button
+                              onClick={() =>
+                                navigate("/app/residents-manager/import-excel")
+                              }
+                              className="fd-btn-warning"
+                            >
+                              <FileSpreadsheet size={16} /> Nhập Excel
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Smart Filter Bar */}
+                    <div className="mb-4">
+                      <ResidentFilter
+                        onFilter={handleFilter}
+                        onRefresh={() => {
+                          if (activeTab === "all") {
+                            refetchContacts();
+                          } else {
+                            refetch();
+                          }
+                        }}
+                        loading={activeTab === "all" ? isContactsLoading : isLoading}
+                      />
+                    </div>
+
+                    {/* Table */}
+                    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white">
+                      <Table
+                        loading={activeTab === "all" ? isContactsLoading : isLoading}
+                        dataSource={activeTab === "all" ? (contactData?.data || []) : (ListResidents?.data || [])}
+                        columns={columns as ColumnType<any>[]}
+                        rowKey="id"
+                        scroll={{ x: 1000 }}
+                        locale={{
+                          emptyText: (
+                            <Empty
+                              image={Empty.PRESENTED_IMAGE_SIMPLE}
+                              description="Không có dữ liệu"
+                            />
+                          ),
+                        }}
+                        onRow={(record) => ({
+                          onDoubleClick: () => {
+                            if (activeTab !== "all") {
+                              navigate(`/app/residents-manager/detail/${record?.id}`);
+                            }
+                          }
+                        })}
+                        pagination={{
+                          current: page,
+                          pageSize: limit,
+                          total: activeTab === "all" ? (contactData?.meta?.total || 0) : (ListResidents?.meta?.total || 0),
+                          showSizeChanger: true,
+                          showTotal: (t) => (
+                            <span className="text-slate-500 text-sm">
+                              Tổng <b>{t}</b> {activeTab === "all" ? "thông tin liên hệ" : "hộ dân"}
+                            </span>
+                          ),
+                          pageSizeOptions: ["10", "20", "50", "100"],
+                          onChange: handlePaginationChange,
+                        }}
+                        className={styles?.customTable}
+                      />
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                key: "with_account",
+                label: (
+                  <span className="text-[16px] font-medium">
+                    Hộ dân có tài khoản
+                  </span>
+                ),
+                children: (
+                  <ResidentWithAccountTab
+                    user={user}
+                    setIsOpenModalDelete={setIsOpenModalDelete}
+                    setId={setId}
+                  />
+                ),
+              },
+              {
+                key: "pending_approval",
+                label: (
+                  <span className="text-[16px] font-medium">
+                    Duyệt tài khoản
+                  </span>
+                ),
+                children: (
+                  <ResidentPendingApprovalTab refetchMain={() => refetch()} />
+                ),
+              },
+              {
+                key: "rejected",
+                label: (
+                  <span className="text-[16px] font-medium">Danh sách hủy</span>
+                ),
+                children: <ResidentRejectedTab refetchMain={() => refetch()} />,
+              },
+            ]}
+          />
         </div>
       </div>
     </>

@@ -7,10 +7,10 @@ export enum Gender {
 export enum Role {
   ADMIN = 'ADMIN',      // Quản trị viên hệ thống
   MANAGER = 'MANAGER',  // Quản lý phường 
-  OFFICER = 'OFFICER',  // Cán bộ phường (công an)
+  OFFICER = 'OFFICER',  // Cán bộ tăng cường
   INSPECTOR = 'INSPECTOR', // Cán bộ hậu kiểm
   PATROL = 'PATROL',    // Cán bộ tuần tra
   LEADER = 'LEADER',    // Tình nguyện viên
   STAFF = 'STAFF',      // Nhân viên y tế
-  RESIDENT = 'RESIDENT', // Cư dân trong phường
+  RESIDENT = 'RESIDENT', // Người dân trong phường
 }

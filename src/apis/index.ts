@@ -1,4 +1,7 @@
 import axios from "axios";
+import { message, notification } from "antd";
+
+let isRedirecting = false;
 
 // 🔥 Tạo instance axios
 export const BASE_URL = axios.create({
@@ -36,25 +39,32 @@ BASE_URL.interceptors.response.use(
   async (error) => {
     const config = error.config;
 
-    // 🔥 Xử lý lỗi 401: Token hết hạn hoặc không hợp lệ
-    // if (error.response && error.response.status === 401) {
-    //   if (!isRedirecting) {
-    //     isRedirecting = true;
-    //     message.error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!");
-    //     localStorage.removeItem("accessToken");
-    //     localStorage.removeItem("user_info"); // Optional, tuỳ bạn có lưu user info không
+    // 🔥 Xử lý lỗi 401: Token hết hạn hoặc không hợp lệ (không bao gồm route đăng nhập)
+    if (
+      error.response &&
+      error.response.status === 401 &&
+      !config?.url?.includes("/auth/login")
+    ) {
+      if (!isRedirecting) {
+        isRedirecting = true;
+        notification.warning({
+          title: "Phiên đăng nhập đã hết hạn",
+          description: "Vui lòng đăng nhập lại",
+        });
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("user");
 
-    //     // Chuyển hướng sang trang đăng nhập nếu chưa ở trang login
-    //     if (window.location.pathname !== "/login") {
-    //       setTimeout(() => {
-    //         window.location.href = "/login";
-    //       }, 1000);
-    //     } else {
-    //       isRedirecting = false;
-    //     }
-    //   }
-    //   return Promise.reject(error);
-    // }
+        // Chuyển hướng sang trang đăng nhập nếu chưa ở trang login
+        if (window.location.pathname !== "/login") {
+          setTimeout(() => {
+            window.location.href = "/login";
+          }, 1500);
+        } else {
+          isRedirecting = false;
+        }
+      }
+      return Promise.reject(error);
+    }
 
     // 🔥 nếu không có config thì reject luôn
     if (!config) {

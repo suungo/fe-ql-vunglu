@@ -1,4 +1,5 @@
 import { Role } from "@/enums";
+import { useSearchParams } from "react-router-dom";
 import { getProfileApi } from "@/pages/profile/api";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -12,6 +13,9 @@ import {
   notification,
   Input,
   Tabs,
+  Form,
+  DatePicker,
+  Table,
 } from "antd";
 import dayjs from "dayjs";
 import {
@@ -26,8 +30,13 @@ import {
   UserCheck,
   XCircle,
   AlertTriangle,
+  Plus,
+  Search,
+  MapPin,
+  Clock,
+  Timer,
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import {
   DispatchReportStatus,
   DispatchReportType,
@@ -42,34 +51,170 @@ import {
   useAcceptDispatch,
   useUpdateDispatchReport,
   useDispatchSocket,
+  useNudgeDispatch,
 } from "../hooks";
 import { DispatchItemCard } from "../components/DispatchItemCard";
+import { DispatchTable } from "../components/DispatchTable";
+import { CreateDispatchModal } from "../components/CreateDispatchModal";
+import { Priority } from "@/pages/reflection/enum";
+
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+  useMap,
+} from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+const incidentIcon = new L.Icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
+
+const patrolIcon = L.divIcon({
+  className: "custom-patrol-marker",
+  html: '<div style="width:28px;height:28px;background:#0ea5e9;border-radius:50%;border:4px solid #fff;box-shadow:0 2px 12px rgba(14,165,233,0.5);position:relative"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:8px;height:8px;background:#fff;border-radius:50%"></div></div>',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -18],
+});
+
+const RoutingPath = ({
+  from,
+  to,
+}: {
+  from: [number, number];
+  to: [number, number];
+}) => {
+  const [route, setRoute] = useState<[number, number][]>([]);
+  const [routeInfo, setRouteInfo] = useState<{
+    distance: number;
+    duration: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!from[0] || !from[1] || !to[0] || !to[1]) return;
+
+    const url = `https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to[1]},${to[0]}?overview=full&geometries=geojson`;
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.code === "Ok" && data.routes && data.routes.length > 0) {
+          const coords = data.routes[0].geometry.coordinates.map((c: any) => [
+            c[1],
+            c[0],
+          ]);
+          setRoute(coords);
+          setRouteInfo({
+            distance: data.routes[0].distance,
+            duration: data.routes[0].duration,
+          });
+        } else {
+          setRoute([from, to]);
+          setRouteInfo(null);
+        }
+      })
+      .catch(() => {
+        setRoute([from, to]);
+        setRouteInfo(null);
+      });
+  }, [from[0], from[1], to[0], to[1]]);
+
+  if (route.length === 0) return null;
+
+  const middleIndex = Math.floor(route.length / 2);
+  const middlePoint = route[middleIndex];
+
+  return (
+    <>
+      <Polyline positions={route} color="#0ea5e9" weight={5} opacity={0.8} />
+      {routeInfo && middlePoint && (
+        <Marker
+          position={middlePoint}
+          icon={L.divIcon({
+            className: "dummy-route-info",
+            html: `<div style="background: white; padding: 4px 8px; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); white-space: nowrap; font-weight: bold; color: #0ea5e9; font-size: 12px; margin-top: -10px; margin-left: -20px;">
+              ${(routeInfo.distance / 1000).toFixed(1)} km - ${Math.round(routeInfo.duration / 60)} phút
+            </div>`,
+            iconSize: [0, 0],
+          })}
+        />
+      )}
+    </>
+  );
+};
+
+const RecenterMap = ({
+  incidentCoords,
+  patrolCoords,
+}: {
+  incidentCoords: [number, number];
+  patrolCoords?: [number, number] | null;
+}) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (patrolCoords && patrolCoords[0] && patrolCoords[1]) {
+      const bounds = L.latLngBounds([incidentCoords, patrolCoords]);
+      map.fitBounds(bounds, { padding: [50, 50] });
+    } else {
+      map.setView(incidentCoords, 15);
+    }
+  }, [
+    incidentCoords[0],
+    incidentCoords[1],
+    patrolCoords?.[0],
+    patrolCoords?.[1],
+    map,
+  ]);
+
+  return null;
+};
 
 const { TextArea } = Input;
 
 export default function ListDispatch() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initReflectionId = searchParams.get("reflectionId")
+    ? Number(searchParams.get("reflectionId"))
+    : null;
+
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [activeTab, setActiveTab] = useState<string>("ALL");
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] =
+    useState(!!initReflectionId);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [showMap, setShowMap] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [selectedDispatch, setSelectedDispatch] =
     useState<DispatchReport | null>(null);
 
-  // Form tạo điều chuyển
-  const [createType, setCreateType] = useState<"inspector" | "patrol">(
-    "inspector",
-  );
-  const [reflectionId, setReflectionId] = useState<number | null>(null);
-  const [assignedTo, setAssignedTo] = useState<number | null>(null);
-  const [createTitle, setCreateTitle] = useState("");
-  const [createDesc, setCreateDesc] = useState("");
-  const [createNote, setCreateNote] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Form cập nhật báo cáo
-  const [reportContent, setReportContent] = useState("");
-  const [reflectionStatusUpdate, setReflectionStatusUpdate] = useState("");
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 400);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
+
+  const [reportForm] = Form.useForm();
+
+  const disabledDate = (current: dayjs.Dayjs) => {
+    return current && current.isBefore(dayjs().startOf("day"));
+  };
 
   const statusFilter = useMemo(() => {
     if (activeTab === "ALL") return undefined;
@@ -81,7 +226,12 @@ export default function ListDispatch() {
     data: dispatches,
     isLoading,
     refetch,
-  } = useDispatchReports({ page, limit, status: statusFilter });
+  } = useDispatchReports({
+    page,
+    limit,
+    status: statusFilter,
+    search: debouncedSearch || undefined,
+  });
 
   // Tải profile của user
   const { data: profileData } = useQuery({
@@ -92,22 +242,81 @@ export default function ListDispatch() {
     },
   });
 
+  const roleCode = profileData?.role?.roleCode;
+  const canSeeRoute = roleCode === Role.MANAGER || roleCode === Role.PATROL;
+  const isSystemManager = roleCode === Role.ADMIN || roleCode === Role.MANAGER;
+  const titleText = "yêu cầu tuần tra";
+  const canCreate = roleCode === Role.ADMIN || roleCode === Role.MANAGER;
+
   // 2. Tải danh sách phản ánh & cán bộ cho form tạo (Chỉ khi modal mở - Tối ưu hóa API load)
-  const staffRole = createType === "inspector" ? "INSPECTOR" : "PATROL";
-  const { data: reflectionsData } = useVerifiedReflections(isCreateModalOpen);
+  const staffRole = "PATROL";
+  const reflectionStatusParam = "VERIFIED";
+  const { data: reflectionsData } = useVerifiedReflections(
+    reflectionStatusParam,
+    isCreateModalOpen,
+  );
   const { data: staffListData } = useStaffList(staffRole, isCreateModalOpen);
 
   const reflectionList = reflectionsData?.data || [];
   const staffList = staffListData?.data || [];
 
   // 3. Đăng ký Socket real-time (Sử dụng Hook mới)
-  useDispatchSocket(refetch);
+  const handlePatrolLocationUpdate = useCallback(
+    (data: { id: number; lat: number; lng: number }) => {
+      setSelectedDispatch((prev) => {
+        if (!prev) return null;
+        if (prev.reflectionId === data.id || prev.reflection?.id === data.id) {
+          return {
+            ...prev,
+            reflection: prev.reflection
+              ? {
+                  ...prev.reflection,
+                  patrolLat: data.lat,
+                  patrolLng: data.lng,
+                }
+              : undefined,
+          } as DispatchReport;
+        }
+        return prev;
+      });
+    },
+    [],
+  );
+
+  useDispatchSocket(refetch, handlePatrolLocationUpdate);
+
+  // Đồng bộ selectedDispatch khi danh sách dispatches được làm mới (real-time)
+  useEffect(() => {
+    if (!selectedDispatch) return;
+    const updated = dispatches?.data?.find((d) => d.id === selectedDispatch.id);
+    if (updated) {
+      setSelectedDispatch((prev) => {
+        if (!prev) return null;
+        // Giữ lại toạ độ GPS realtime nếu đang có
+        const patrolLat =
+          prev.reflection?.patrolLat ?? updated.reflection?.patrolLat;
+        const patrolLng =
+          prev.reflection?.patrolLng ?? updated.reflection?.patrolLng;
+        return {
+          ...updated,
+          reflection: updated.reflection
+            ? {
+                ...updated.reflection,
+                patrolLat,
+                patrolLng,
+              }
+            : undefined,
+        } as DispatchReport;
+      });
+    }
+  }, [dispatches?.data, selectedDispatch?.id]);
 
   // 4. Mutations cho các tác vụ thay đổi dữ liệu (Sử dụng Hook mới)
   const createInspectorMutation = useCreateDispatchToInspector();
   const createPatrolMutation = useCreateDispatchToPatrol();
   const acceptMutation = useAcceptDispatch();
   const updateReportMutation = useUpdateDispatchReport();
+  const nudgeMutation = useNudgeDispatch();
 
   // ── HELPERS ──────────────────────────────────────────────────────────
 
@@ -119,7 +328,7 @@ export default function ListDispatch() {
       [DispatchReportStatus.PENDING]: {
         color: "orange",
         icon: <Clock size={12} />,
-        label: "Chờ xác nhận",
+        label: "Chờ xử lý",
       },
       [DispatchReportStatus.ACCEPTED]: {
         color: "cyan",
@@ -169,48 +378,35 @@ export default function ListDispatch() {
   };
 
   const getTypeTag = (type: DispatchReportType) => {
-    if (type === DispatchReportType.MANAGER_TO_INSPECTOR)
-      return <Tag color="purple">QL → Hậu kiểm</Tag>;
-    return <Tag color="blue">Hậu kiểm → Tuần tra</Tag>;
+    return <Tag color="blue">Yêu cầu tuần tra</Tag>;
   };
-
-  const Clock = ({ size }: { size: number }) => (
-    <span className="inline-flex items-center justify-center">
-      <CheckCircle size={size} />
-    </span>
-  );
-  const Timer = ({ size }: { size: number }) => (
-    <span className="inline-flex items-center justify-center">
-      <CheckCircle size={size} />
-    </span>
-  );
 
   // ── XỬ LÝ TẠO ĐIỀU CHUYỂN ──────────────────────────────────────────
 
-  const handleCreate = async () => {
-    if (!reflectionId || !assignedTo) {
-      notification.warning({ message: "Vui lòng chọn phản ánh và cán bộ" });
-      return;
-    }
-
+  const handleCreate = async (values: any) => {
     const data = {
-      reflectionId,
-      assignedTo,
-      title: createTitle || undefined,
-      description: createDesc || undefined,
-      note: createNote || undefined,
+      reflectionId: values.reflectionId,
+      assignedTo:
+        values.assignedTo === "OTHER"
+          ? undefined
+          : values.assignedTo || undefined,
+      customHandler:
+        values.assignedTo === "OTHER" ? values.customHandler : undefined,
+      expectedTime: values.expectedTime
+        ? values.expectedTime.toISOString()
+        : undefined,
+      description: values.description || undefined,
+      title: undefined,
+      note: undefined,
     };
-
-    const mutation =
-      createType === "inspector"
-        ? createInspectorMutation
-        : createPatrolMutation;
+    // Luồng mới: luôn tạo yêu cầu cho PATROL
+    const mutation = createPatrolMutation;
 
     mutation.mutate(data, {
       onSuccess: () => {
         notification.success({
           message: "Thành công",
-          description: "Tạo điều chuyển thành công!",
+          description: `Tạo ${titleText} thành công!`,
         });
         setIsCreateModalOpen(false);
         resetCreateForm();
@@ -219,18 +415,14 @@ export default function ListDispatch() {
         notification.error({
           message: "Thất bại",
           description:
-            err?.response?.data?.message || "Không thể tạo điều chuyển",
+            err?.response?.data?.message || `Không thể tạo ${titleText}`,
         });
       },
     });
   };
 
   const resetCreateForm = () => {
-    setReflectionId(null);
-    setAssignedTo(null);
-    setCreateTitle("");
-    setCreateDesc("");
-    setCreateNote("");
+    setSearchParams({});
   };
 
   // ── XÁC NHẬN NHẬN VIỆC ─────────────────────────────────────────────
@@ -255,14 +447,17 @@ export default function ListDispatch() {
 
   // ── CẬP NHẬT BÁO CÁO ──────────────────────────────────────────────
 
-  const handleUpdateReport = async () => {
+  const handleUpdateReport = async (values: any) => {
     if (!selectedDispatch) return;
     updateReportMutation.mutate(
       {
         id: selectedDispatch.id,
         data: {
-          reportContent: reportContent || undefined,
-          reflectionStatusUpdate: reflectionStatusUpdate || undefined,
+          reportContent: values.reportContent || undefined,
+          reflectionStatusUpdate: values.reflectionStatusUpdate || undefined,
+          expectedTime: values.expectedTime
+            ? values.expectedTime.toISOString()
+            : undefined,
           status: DispatchReportStatus.COMPLETED,
         },
       },
@@ -273,8 +468,7 @@ export default function ListDispatch() {
             description: "Đã cập nhật báo cáo!",
           });
           setIsReportModalOpen(false);
-          setReportContent("");
-          setReflectionStatusUpdate("");
+          reportForm.resetFields();
         },
         onError: (err: any) => {
           notification.error({
@@ -286,19 +480,34 @@ export default function ListDispatch() {
     );
   };
 
+  const handleNudge = (id: number) => {
+    nudgeMutation.mutate(id, {
+      onSuccess: () => {
+        notification.success({
+          message: "Thành công",
+          description: "Đã gửi yêu cầu thúc giục cán bộ xử lý!",
+        });
+      },
+      onError: (err: any) => {
+        notification.error({
+          message: "Thất bại",
+          description:
+            err?.response?.data?.message || "Không thể gửi thúc giục",
+        });
+      },
+    });
+  };
+
   // ── RENDER ──────────────────────────────────────────────────────────
 
-  const roleCode = profileData?.role?.roleCode;
-  const canCreate =
-    roleCode === Role.ADMIN ||
-    roleCode === Role.MANAGER ||
-    roleCode === Role.INSPECTOR;
+  // Render variables already declared above
 
   const isMutationLoading =
     createInspectorMutation.isPending ||
     createPatrolMutation.isPending ||
     acceptMutation.isPending ||
-    updateReportMutation.isPending;
+    updateReportMutation.isPending ||
+    nudgeMutation.isPending;
 
   return (
     <div className="space-y-4">
@@ -306,45 +515,46 @@ export default function ListDispatch() {
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
-              <ArrowRightLeft size={20} className="text-white" />
-            </div>
             <div>
               <h2 className="text-lg font-bold text-slate-800">
-                Quản lý điều chuyển
+                Danh sách {titleText}
               </h2>
-              <p className="text-xs text-slate-500">
-                Theo dõi quá trình điều chuyển phản ánh giữa các cán bộ
-              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             {canCreate && (
               <Button
                 type="primary"
-                icon={<Send size={14} />}
                 className="flex items-center gap-1"
-                style={{ backgroundColor: "#7c3aed", borderColor: "#7c3aed" }}
                 onClick={() => {
-                  setCreateType(
-                    roleCode === Role.INSPECTOR ? "patrol" : "inspector",
-                  );
                   setIsCreateModalOpen(true);
                 }}
               >
-                Tạo điều chuyển
+                <Plus size={16} />
+                Thêm mới
               </Button>
             )}
-            <Tooltip title="Làm mới">
-              <RefreshCw
-                size={20}
-                className={`cursor-pointer text-slate-400 hover:text-blue-500 transition ${isLoading ? "animate-spin" : ""}`}
-                onClick={() => refetch()}
-              />
-            </Tooltip>
           </div>
         </div>
-
+        <div className="flex items-center justify-end gap-2">
+          <Input
+            placeholder="Tìm kiếm theo mã, tiêu đề, mô tả..."
+            prefix={<Search className="text-[#484848]" size={16} />}
+            className="h-8! w-[250px]!"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+            }}
+            allowClear
+          />
+          <Tooltip title="Làm mới">
+            <RefreshCw
+              size={20}
+              className={`cursor-pointer text-slate-400 hover:text-blue-500 transition ${isLoading ? "animate-spin" : ""}`}
+              onClick={() => refetch()}
+            />
+          </Tooltip>
+        </div>
         {/* Tabs lọc trạng thái */}
         <Tabs
           activeKey={activeTab}
@@ -353,12 +563,36 @@ export default function ListDispatch() {
             setPage(1);
           }}
           items={[
-            { key: "ALL", label: "Tất cả" },
-            { key: DispatchReportStatus.PENDING, label: "Chờ xác nhận" },
-            { key: DispatchReportStatus.ACCEPTED, label: "Đã xác nhận" },
-            { key: DispatchReportStatus.IN_PROGRESS, label: "Đang xử lý" },
-            { key: DispatchReportStatus.COMPLETED, label: "Hoàn thành" },
-            { key: DispatchReportStatus.EXPIRED, label: "Hết hạn" },
+            {
+              key: "ALL",
+              label: <span className="font-medium text-[16px]">Tất cả</span>,
+            },
+            {
+              key: DispatchReportStatus.PENDING,
+              label: <span className="font-medium text-[16px]">Chờ xử lý</span>,
+            },
+            // {
+            //   key: DispatchReportStatus.ACCEPTED,
+            //   label: (
+            //     <span className="font-medium text-[16px]">Đã xác nhận</span>
+            //   ),
+            // },
+            {
+              key: DispatchReportStatus.IN_PROGRESS,
+              label: (
+                <span className="font-medium text-[16px]">Đang xử lý</span>
+              ),
+            },
+            {
+              key: DispatchReportStatus.COMPLETED,
+              label: (
+                <span className="font-medium text-[16px]">Hoàn thành</span>
+              ),
+            },
+            {
+              key: DispatchReportStatus.EXPIRED,
+              label: <span className="font-medium text-[16px]">Hết hạn</span>,
+            },
           ]}
           className="mb-2"
         />
@@ -369,34 +603,20 @@ export default function ListDispatch() {
             <Spin />
           </div>
         ) : (
-          <List
-            dataSource={dispatches?.data}
-            split={false}
-            className="space-y-3"
-            renderItem={(item: DispatchReport) => (
-              <List.Item className="p-0! border-0! mb-3">
-                <DispatchItemCard
-                  item={item}
-                  onClick={() => {
-                    setSelectedDispatch(item);
-                    setIsDetailModalOpen(true);
-                  }}
-                  onViewDetail={() => {
-                    setSelectedDispatch(item);
-                    setIsDetailModalOpen(true);
-                  }}
-                />
-              </List.Item>
-            )}
-            locale={{ emptyText: "Không có điều chuyển nào" }}
-            pagination={{
-              current: page,
-              pageSize: limit,
-              total: dispatches?.meta?.total || 0,
-              onChange: (p) => setPage(p),
-              hideOnSinglePage: true,
-            }}
-          />
+          <div className="mt-4">
+            <DispatchTable
+              dataSource={dispatches?.data || []}
+              loading={isLoading}
+              page={page}
+              limit={limit}
+              total={dispatches?.meta?.total || 0}
+              onPageChange={(p) => setPage(p)}
+              onViewDetail={(record) => {
+                setSelectedDispatch(record);
+                setIsDetailModalOpen(true);
+              }}
+            />
+          </div>
         )}
       </div>
 
@@ -404,45 +624,64 @@ export default function ListDispatch() {
       <Modal
         title={
           <div className="flex items-center gap-2">
-            <FileText size={18} className="text-purple-600" />
-            <span>Chi tiết biên bản điều chuyển</span>
+            <span>Chi tiết yêu cầu</span>
           </div>
         }
         open={isDetailModalOpen}
         onCancel={() => setIsDetailModalOpen(false)}
+        afterOpenChange={(open) => setShowMap(open)}
         width={700}
+        destroyOnClose={true}
         footer={
           selectedDispatch ? (
             <div className="flex justify-end gap-2">
-              {/* Nút xác nhận nhận việc (INSPECTOR/PATROL khi PENDING) */}
+              {/* Nút xác nhận nhận việc (PATROL khi PENDING) */}
               {selectedDispatch.status === DispatchReportStatus.PENDING &&
-                selectedDispatch.assignedTo === profileData?.id && (
+                selectedDispatch.assignedTo === profileData?.id &&
+                roleCode === Role.PATROL && (
                   <Button
                     type="primary"
-                    icon={<CheckCircle size={14} />}
                     onClick={() => handleAccept(selectedDispatch.id)}
                     loading={isMutationLoading}
-                    style={{ backgroundColor: "#059669" }}
                   >
                     Xác nhận nhận việc
                   </Button>
                 )}
-              {/* Nút cập nhật báo cáo (khi ACCEPTED) */}
+              {/* Nút cập nhật báo cáo (PATROL khi ACCEPTED) */}
               {selectedDispatch.status === DispatchReportStatus.ACCEPTED &&
-                selectedDispatch.assignedTo === profileData?.id && (
+                selectedDispatch.assignedTo === profileData?.id &&
+                roleCode === Role.PATROL && (
                   <Button
                     type="primary"
-                    icon={<FileText size={14} />}
                     onClick={() => {
-                      setReportContent(selectedDispatch.reportContent || "");
-                      setReflectionStatusUpdate(
-                        selectedDispatch.reflectionStatusUpdate || "",
-                      );
+                      reportForm.setFieldsValue({
+                        reportContent: selectedDispatch.reportContent || "",
+                        reflectionStatusUpdate:
+                          selectedDispatch.reflectionStatusUpdate || "",
+                        expectedTime: selectedDispatch.expectedTime
+                          ? dayjs(selectedDispatch.expectedTime)
+                          : null,
+                      });
                       setIsReportModalOpen(true);
                     }}
-                    style={{ backgroundColor: "#7c3aed" }}
                   >
                     Cập nhật báo cáo
+                  </Button>
+                )}
+              {/* Nút Thúc giục (cho MANAGER, ADMIN khi PENDING, ACCEPTED, hoặc IN_PROGRESS) */}
+              {(roleCode === Role.MANAGER || roleCode === Role.ADMIN) &&
+                [
+                  DispatchReportStatus.PENDING,
+                  DispatchReportStatus.ACCEPTED,
+                  DispatchReportStatus.IN_PROGRESS,
+                ].includes(selectedDispatch.status) && (
+                  <Button
+                    type="default"
+                    danger
+                    onClick={() => handleNudge(selectedDispatch.id)}
+                    loading={nudgeMutation.isPending}
+                  >
+                    Thúc giục cán bộ
                   </Button>
                 )}
               <Button onClick={() => setIsDetailModalOpen(false)}>Đóng</Button>
@@ -456,7 +695,7 @@ export default function ListDispatch() {
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-xl font-bold text-slate-800 mb-1">
-                  {selectedDispatch.title || "Biên bản điều chuyển"}
+                  {selectedDispatch.title || `Biên bản ${titleText}`}
                 </h3>
                 <div className="text-sm text-slate-500">
                   Mã:{" "}
@@ -468,56 +707,6 @@ export default function ListDispatch() {
               <div className="flex gap-2">
                 {getStatusTag(selectedDispatch.status)}
                 {getTypeTag(selectedDispatch.type)}
-              </div>
-            </div>
-
-            {/* Timeline */}
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-100">
-              <h4 className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-3">
-                Tiến trình
-              </h4>
-              <div className="flex items-center gap-2 text-sm">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-green-500" />
-                  <span>
-                    Tạo:{" "}
-                    {dayjs(selectedDispatch.assignedAt).format("HH:mm DD/MM")}
-                  </span>
-                </div>
-                <span className="text-slate-300">→</span>
-                {selectedDispatch.acceptedAt ? (
-                  <div className="flex items-center gap-1.5">
-                     <div className="w-3 h-3 rounded-full bg-cyan-500" />
-                     <span>
-                       Nhận:{" "}
-                       {dayjs(selectedDispatch.acceptedAt).format(
-                         "HH:mm DD/MM",
-                       )}
-                     </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-orange-400 animate-pulse" />
-                    <span className="text-orange-600">
-                      Hạn:{" "}
-                      {dayjs(selectedDispatch.expiredAt).format("HH:mm DD/MM")}
-                    </span>
-                  </div>
-                )}
-                {selectedDispatch.completedAt && (
-                  <>
-                    <span className="text-slate-300">→</span>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-full bg-green-600" />
-                      <span>
-                        Xong:{" "}
-                        {dayjs(selectedDispatch.completedAt).format(
-                          "HH:mm DD/MM",
-                        )}
-                      </span>
-                    </div>
-                  </>
-                )}
               </div>
             </div>
 
@@ -551,10 +740,15 @@ export default function ListDispatch() {
                   </div>
                   <div>
                     <div className="font-bold text-slate-700">
-                      {selectedDispatch.assignee?.fullName || "—"}
+                      {selectedDispatch.assignee?.fullName ||
+                        selectedDispatch.customHandler ||
+                        "—"}
                     </div>
                     <div className="text-xs text-slate-500">
-                      {selectedDispatch.assignee?.phoneNumber || ""}
+                      {selectedDispatch.assignee?.phoneNumber ||
+                        (selectedDispatch.customHandler
+                          ? "Xử lý ngoài hệ thống"
+                          : "")}
                     </div>
                   </div>
                 </div>
@@ -577,12 +771,130 @@ export default function ListDispatch() {
                   </div>
                   {selectedDispatch.reflection.address && (
                     <div className="text-xs text-amber-600 mt-1">
-                      📍 {selectedDispatch.reflection.address}
+                      {selectedDispatch.reflection.address}
                     </div>
                   )}
                 </div>
               </div>
             )}
+
+            {/* Bản đồ theo dõi thời gian thực */}
+            {showMap &&
+              selectedDispatch.reflection &&
+              selectedDispatch.reflection.lat &&
+              selectedDispatch.reflection.lng && (
+                <div>
+                  <span className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Bản đồ theo dõi thời gian thực
+                  </span>
+                  <div className="h-64 w-full rounded-xl overflow-hidden border border-slate-200 relative z-0">
+                    <MapContainer
+                      center={[
+                        selectedDispatch.reflection.lat,
+                        selectedDispatch.reflection.lng,
+                      ]}
+                      zoom={15}
+                      style={{ height: "100%", width: "100%" }}
+                    >
+                      <TileLayer
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                      />
+                      <RecenterMap
+                        incidentCoords={[
+                          selectedDispatch.reflection.lat,
+                          selectedDispatch.reflection.lng,
+                        ]}
+                        patrolCoords={
+                          canSeeRoute &&
+                          selectedDispatch.reflection.patrolLat &&
+                          selectedDispatch.reflection.patrolLng
+                            ? [
+                                selectedDispatch.reflection.patrolLat,
+                                selectedDispatch.reflection.patrolLng,
+                              ]
+                            : null
+                        }
+                      />
+                      {/* Điểm sự cố */}
+                      <Marker
+                        position={[
+                          selectedDispatch.reflection.lat,
+                          selectedDispatch.reflection.lng,
+                        ]}
+                        icon={incidentIcon}
+                      >
+                        <Popup>
+                          <div>
+                            <strong>Điểm sự cố</strong>
+                            <p className="text-xs text-slate-500 m-0">
+                              {selectedDispatch.reflection.address || ""}
+                            </p>
+                          </div>
+                        </Popup>
+                      </Marker>
+
+                      {/* Lộ trình đường đi thực tế */}
+                      {canSeeRoute &&
+                        selectedDispatch.reflection.patrolLat &&
+                        selectedDispatch.reflection.patrolLng && (
+                          <RoutingPath
+                            from={[
+                              selectedDispatch.reflection.patrolLat,
+                              selectedDispatch.reflection.patrolLng,
+                            ]}
+                            to={[
+                              selectedDispatch.reflection.lat,
+                              selectedDispatch.reflection.lng,
+                            ]}
+                          />
+                        )}
+
+                      {/* Vị trí cán bộ tuần tra */}
+                      {canSeeRoute &&
+                        selectedDispatch.reflection.patrolLat &&
+                        selectedDispatch.reflection.patrolLng && (
+                          <Marker
+                            position={[
+                              selectedDispatch.reflection.patrolLat,
+                              selectedDispatch.reflection.patrolLng,
+                            ]}
+                            icon={patrolIcon}
+                          >
+                            <Popup>
+                              <div>
+                                <strong>
+                                  Cán bộ tuần tra:{" "}
+                                  {selectedDispatch.assignee?.fullName || ""}
+                                </strong>
+                                <p className="text-xs text-slate-500 m-0">
+                                  Vị trí hiện tại
+                                </p>
+                              </div>
+                            </Popup>
+                          </Marker>
+                        )}
+                    </MapContainer>
+                  </div>
+                  {canSeeRoute && (
+                    selectedDispatch.reflection.patrolLat &&
+                    selectedDispatch.reflection.patrolLng ? (
+                      <div className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block mr-1" />
+                        Đang nhận tín hiệu GPS trực tuyến của{" "}
+                        <strong>
+                          {selectedDispatch.assignee?.fullName || "cán bộ"}
+                        </strong>
+                        .
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-400 mt-1">
+                        Chưa nhận được tín hiệu GPS từ cán bộ tuần tra.
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
 
             {/* Mô tả */}
             {selectedDispatch.description && (
@@ -634,137 +946,18 @@ export default function ListDispatch() {
       </Modal>
 
       {/* ══════════ MODAL TẠO ĐIỀU CHUYỂN ══════════ */}
-      <Modal
-        title={
-          <div className="flex items-center gap-2">
-            <Send size={18} className="text-purple-600" />
-            <span>
-              Tạo điều chuyển mới{" "}
-              {createType === "inspector" ? "(→ Hậu kiểm)" : "(→ Tuần tra)"}
-            </span>
-          </div>
-        }
+      <CreateDispatchModal
         open={isCreateModalOpen}
         onCancel={() => {
           setIsCreateModalOpen(false);
           resetCreateForm();
         }}
-        footer={[
-          <Button
-            key="cancel"
-            onClick={() => {
-              setIsCreateModalOpen(false);
-              resetCreateForm();
-            }}
-          >
-            Hủy
-          </Button>,
-          <Button
-            key="create"
-            type="primary"
-            loading={isMutationLoading}
-            disabled={!reflectionId || !assignedTo}
-            onClick={handleCreate}
-            style={{ backgroundColor: "#7c3aed", borderColor: "#7c3aed" }}
-            icon={<Send size={14} />}
-          >
-            Xác nhận điều chuyển
-          </Button>,
-        ]}
-      >
-        <div className="space-y-4 py-2">
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-2">
-              Phản ánh <span className="text-red-500">*</span>
-            </label>
-            <Select
-              placeholder="Chọn phản ánh..."
-              className="w-full"
-              value={reflectionId}
-              onChange={(val) => setReflectionId(val)}
-              options={reflectionList.map((r: any) => ({
-                value: r.id,
-                label: `#${r.id} — ${r.title || r.content?.slice(0, 50)}`,
-              }))}
-              showSearch
-              filterOption={(input, option) =>
-                String(option?.label ?? "")
-                  .toLowerCase()
-                  .includes(input.toLowerCase())
-              }
-              notFoundContent={
-                <div className="text-center text-slate-400 py-3 text-sm">
-                  Không có phản ánh nào phù hợp
-                </div>
-              }
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-2">
-              Cán bộ {createType === "inspector" ? "Hậu kiểm" : "Tuần tra"}{" "}
-              <span className="text-red-500">*</span>
-            </label>
-            <Select
-              placeholder="Chọn cán bộ..."
-              className="w-full"
-              value={assignedTo}
-              onChange={(val) => setAssignedTo(val)}
-              options={staffList.map((u: any) => ({
-                value: u.id,
-                label: u.fullName,
-              }))}
-              showSearch
-              filterOption={(input, option) =>
-                String(option?.label ?? "")
-                  .toLowerCase()
-                  .includes(input.toLowerCase())
-              }
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-2">
-              Tiêu đề (Tùy chọn)
-            </label>
-            <Input
-              placeholder="Nhập tiêu đề biên bản..."
-              value={createTitle}
-              onChange={(e) => setCreateTitle(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-2">
-              Mô tả chi tiết (Tùy chọn)
-            </label>
-            <TextArea
-              placeholder="Nhập mô tả chi tiết..."
-              value={createDesc}
-              onChange={(e) => setCreateDesc(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-2">
-              Ghi chú (Tùy chọn)
-            </label>
-            <TextArea
-              placeholder="Nhập ghi chú..."
-              value={createNote}
-              onChange={(e) => setCreateNote(e.target.value)}
-              rows={2}
-            />
-          </div>
-
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800">
-            <AlertTriangle size={14} className="inline mr-1.5" />
-            Cán bộ được chỉ định sẽ có <strong>5 phút</strong> để xác nhận. Nếu
-            quá hạn, điều chuyển sẽ tự động hủy và bạn có thể tạo lại.
-          </div>
-        </div>
-      </Modal>
+        loading={isMutationLoading}
+        onCreate={handleCreate}
+        reflectionList={reflectionList}
+        staffList={staffList}
+        initReflectionId={initReflectionId}
+      />
 
       {/* ══════════ MODAL CẬP NHẬT BÁO CÁO ══════════ */}
       <Modal
@@ -775,17 +968,25 @@ export default function ListDispatch() {
           </div>
         }
         open={isReportModalOpen}
-        onCancel={() => setIsReportModalOpen(false)}
+        onCancel={() => {
+          setIsReportModalOpen(false);
+          reportForm.resetFields();
+        }}
         footer={[
-          <Button key="cancel" onClick={() => setIsReportModalOpen(false)}>
+          <Button
+            key="cancel"
+            onClick={() => {
+              setIsReportModalOpen(false);
+              reportForm.resetFields();
+            }}
+          >
             Hủy
           </Button>,
           <Button
             key="submit"
             type="primary"
             loading={isMutationLoading}
-            disabled={!reportContent}
-            onClick={handleUpdateReport}
+            onClick={() => reportForm.submit()}
             style={{ backgroundColor: "#059669" }}
             icon={<Check size={14} />}
           >
@@ -793,40 +994,77 @@ export default function ListDispatch() {
           </Button>,
         ]}
       >
-        <div className="space-y-4 py-2">
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-2">
-              Trạng thái phản ánh{" "}
-              {selectedDispatch?.type ===
-                DispatchReportType.INSPECTOR_TO_PATROL && (
-                <span className="text-red-500">* (Bắt buộc)</span>
-              )}
-            </label>
+        <Form
+          form={reportForm}
+          layout="vertical"
+          onFinish={handleUpdateReport}
+          className="py-2"
+        >
+          <Form.Item
+            name="reflectionStatusUpdate"
+            label={
+              <span className="text-xs font-bold text-slate-600">
+                Trạng thái phản ánh{" "}
+                {selectedDispatch?.type ===
+                  DispatchReportType.INSPECTOR_TO_PATROL && (
+                  <span className="text-red-500">* (Bắt buộc)</span>
+                )}
+              </span>
+            }
+            rules={
+              selectedDispatch?.type === DispatchReportType.INSPECTOR_TO_PATROL
+                ? [
+                    {
+                      required: true,
+                      message: "Vui lòng chọn trạng thái phản ánh!",
+                    },
+                  ]
+                : []
+            }
+          >
             <Select
               placeholder="Chọn trạng thái..."
               className="w-full"
-              value={reflectionStatusUpdate || undefined}
-              onChange={(val) => setReflectionStatusUpdate(val)}
               options={[
                 { value: "IN_PROGRESS", label: "Đang xử lý" },
                 { value: "COMPLETED", label: "Hoàn thành xử lý" },
                 { value: "RESOLVED", label: "Đã giải quyết" },
               ]}
             />
-          </div>
+          </Form.Item>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-2">
-              Nội dung báo cáo <span className="text-red-500">*</span>
-            </label>
+          <Form.Item
+            name="expectedTime"
+            label={
+              <span className="text-xs font-bold text-slate-600">
+                Thời gian dự kiến hoàn thành mới
+              </span>
+            }
+          >
+            <DatePicker
+              placeholder="Chọn thời gian dự kiến mới..."
+              className="w-full"
+              disabledDate={disabledDate}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="reportContent"
+            label={
+              <span className="text-xs font-bold text-slate-600">
+                Nội dung báo cáo <span className="text-red-500">*</span>
+              </span>
+            }
+            rules={[
+              { required: true, message: "Vui lòng nhập nội dung báo cáo!" },
+            ]}
+          >
             <TextArea
               placeholder="Mô tả chi tiết quá trình xử lý, kết quả..."
-              value={reportContent}
-              onChange={(e) => setReportContent(e.target.value)}
               rows={5}
             />
-          </div>
-        </div>
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

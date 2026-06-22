@@ -63,7 +63,7 @@ export default function Login() {
 
       notification.success({
         message: "Đăng ký thành công",
-        description: "Hệ thống đã ghi nhận thông tin xác thực cư dân của bạn.",
+        description: "Hệ thống đã ghi nhận thông tin xác thực người dân của bạn.",
       });
 
       navigate("/login");
@@ -110,7 +110,7 @@ export default function Login() {
               scrollToFirstError
               form={form}
             >
-              <div className="mb-2 lg:h-full h-[300px] overflow-y-auto hide-scrollbar">
+              <div className="mb-2 lg:h-full h-[300px]!  overflow-y-auto hide-scrollbar">
                 <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
                   <Form.Item<RegisterRequest>
                     required={false}
@@ -218,6 +218,41 @@ export default function Login() {
                   </Form.Item>
                 </div>
                 <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+                  <Form.Item<RegisterRequest>
+                    name="cccd"
+                    required={false}
+                    label={
+                      <p className="text-[16px] text-[#464646] font-medium">
+                        Số CCCD
+                        <span className="text-[#D32F2F] ml-1">*</span>
+                      </p>
+                    }
+                    validateTrigger={["onBlur", "onChange"]}
+                    rules={[
+                      {
+                        required: true,
+                        validator: (_, value) => {
+                          return new Promise((resolve, reject) => {
+                            const cccdRegex = /^[0-9]{9}$|^[0-9]{12}$/;
+                            if (!value) {
+                              reject(new Error("Vui lòng nhập số CCCD"));
+                            } else if (!cccdRegex.test(value)) {
+                              reject(new Error("Số CCCD phải có 9 hoặc 12 chữ số"));
+                            } else {
+                              resolve("");
+                            }
+                          });
+                        },
+                      },
+                    ]}
+                  >
+                    <Input
+                      placeholder="Nhập số CCCD (9 hoặc 12 chữ số)"
+                      className="bg-[#F5F5F5] rounded-[10px] h-9! flex justify-center"
+                      allowClear
+                      maxLength={12}
+                    />
+                  </Form.Item>
                   <Form.Item<RegisterRequest>
                     name="province"
                     required={false}
@@ -341,9 +376,206 @@ export default function Login() {
                     <Input className="w-full h-9!" placeholder="Nhập địa chỉ" />
                   </Form.Item>
                 </div>
+
+                <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+                  <Form.Item<RegisterRequest>
+                    name="houseType"
+                    required={false}
+                    label={
+                      <p className="text-[16px] text-[#464646] font-medium">
+                        Loại nhà
+                        <span className="text-[#D32F2F] ml-1">*</span>
+                      </p>
+                    }
+                    validateTrigger={["onBlur", "onChange"]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng chọn loại nhà",
+                      },
+                    ]}
+                  >
+                    <Select
+                      placeholder="Chọn loại nhà"
+                      className="bg-[#F5F5F5] rounded-[10px] h-9! flex items-center"
+                      allowClear
+                    >
+                      <Option value="HOUSE_LEVEL_4">Nhà cấp 4</Option>
+                      <Option value="HOUSE_STREET">Nhà phố (Nhà ống)</Option>
+                      <Option value="HOUSE_ALLEY">Nhà trong hẻm</Option>
+                      <Option value="HOUSE_FRONTAGE">Nhà mặt tiền</Option>
+                      <Option value="APARTMENT">Chung cư / căn hộ</Option>
+                      <Option value="RENTAL_HOUSE">Nhà trọ / phòng trọ</Option>
+                      <Option value="VILLA">Biệt thự / nhà liền kề</Option>
+                    </Select>
+                  </Form.Item>
+                  <Form.Item<RegisterRequest>
+                    name="numberOfMembers"
+                    required={false}
+                    label={
+                      <p className="text-[16px] text-[#464646] font-medium">
+                        Số thành viên
+                        <span className="text-[#D32F2F] ml-1">*</span>
+                      </p>
+                    }
+                    validateTrigger={["onBlur", "onChange"]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng nhập số thành viên",
+                      },
+                    ]}
+                  >
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="Nhập số thành viên"
+                      className="bg-[#F5F5F5] rounded-[10px] h-9! flex items-center"
+                    />
+                  </Form.Item>
+                </div>
+
+                <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+                  <Form.Item<RegisterRequest>
+                    name="hasElderly"
+                    required={false}
+                    label={
+                      <p className="text-[16px] text-[#464646] font-medium">
+                        Có người già
+                        <span className="text-[#D32F2F] ml-1">*</span>
+                      </p>
+                    }
+                    validateTrigger={["onBlur", "onChange"]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng chọn có/không",
+                      },
+                    ]}
+                  >
+                    <Select
+                      placeholder="Chọn có/không"
+                      className="bg-[#F5F5F5] rounded-[10px] h-9! flex items-center"
+                      allowClear
+                    >
+                      <Option value="YES">Có</Option>
+                      <Option value="NO">Không</Option>
+                    </Select>
+                  </Form.Item>
+                  <Form.Item<RegisterRequest>
+                    name="hasChildren"
+                    required={false}
+                    label={
+                      <p className="text-[16px] text-[#464646] font-medium">
+                        Có trẻ em
+                        <span className="text-[#D32F2F] ml-1">*</span>
+                      </p>
+                    }
+                    validateTrigger={["onBlur", "onChange"]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng chọn có/không",
+                      },
+                    ]}
+                  >
+                    <Select
+                      placeholder="Chọn có/không"
+                      className="bg-[#F5F5F5] rounded-[10px] h-9! flex items-center"
+                      allowClear
+                    >
+                      <Option value="YES">Có</Option>
+                      <Option value="NO">Không</Option>
+                    </Select>
+                  </Form.Item>
+                </div>
+
+                <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+                  <Form.Item<RegisterRequest>
+                    name="hasPregnantWomen"
+                    required={false}
+                    label={
+                      <p className="text-[16px] text-[#464646] font-medium">
+                        Có phụ nữ mang thai
+                        <span className="text-[#D32F2F] ml-1">*</span>
+                      </p>
+                    }
+                    validateTrigger={["onBlur", "onChange"]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng chọn có/không",
+                      },
+                    ]}
+                  >
+                    <Select
+                      placeholder="Chọn có/không"
+                      className="bg-[#F5F5F5] rounded-[10px] h-9! flex items-center"
+                      allowClear
+                    >
+                      <Option value="YES">Có</Option>
+                      <Option value="NO">Không</Option>
+                    </Select>
+                  </Form.Item>
+                  <Form.Item<RegisterRequest>
+                    name="hasChronicDisease"
+                    required={false}
+                    label={
+                      <p className="text-[16px] text-[#464646] font-medium">
+                        Có người có bệnh nền
+                        <span className="text-[#D32F2F] ml-1">*</span>
+                      </p>
+                    }
+                    validateTrigger={["onBlur", "onChange"]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng chọn có/không",
+                      },
+                    ]}
+                  >
+                    <Select
+                      placeholder="Chọn có/không"
+                      className="bg-[#F5F5F5] rounded-[10px] h-9! flex items-center"
+                      allowClear
+                    >
+                      <Option value="YES">Có</Option>
+                      <Option value="NO">Không</Option>
+                    </Select>
+                  </Form.Item>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <Form.Item<RegisterRequest>
+                    name="hasBusiness"
+                    required={false}
+                    label={
+                      <p className="text-[16px] text-[#464646] font-medium">
+                        Có kinh doanh
+                        <span className="text-[#D32F2F] ml-1">*</span>
+                      </p>
+                    }
+                    validateTrigger={["onBlur", "onChange"]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng chọn có/không",
+                      },
+                    ]}
+                  >
+                    <Select
+                      placeholder="Chọn có/không"
+                      className="bg-[#F5F5F5] rounded-[10px] h-9! flex items-center"
+                      allowClear
+                    >
+                      <Option value="YES">Có</Option>
+                      <Option value="NO">Không</Option>
+                    </Select>
+                  </Form.Item>
+                </div>
               </div>
 
-              <Form.Item className="">
+              <Form.Item className="pt-2!">
                 <Button
                   loading={isLoading}
                   htmlType="submit"

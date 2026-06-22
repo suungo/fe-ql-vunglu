@@ -10,6 +10,7 @@ import {
   updateDispatchReportApi,
   getVerifiedReflectionsApi,
   getStaffByRoleApi,
+  nudgeDispatchApi,
   type DispatchReportParams,
 } from "../api";
 import { DispatchReportStatus } from "../interfaces";
@@ -34,10 +35,10 @@ export const useDispatchReport = (id: number, enabled = true) => {
 };
 
 // 3. Hook lấy danh sách phản ánh đã xác minh
-export const useVerifiedReflections = (enabled = true) => {
+export const useVerifiedReflections = (status = "VERIFIED", enabled = true) => {
   return useQuery({
-    queryKey: ["verified-reflections"],
-    queryFn: getVerifiedReflectionsApi,
+    queryKey: ["verified-reflections", status],
+    queryFn: () => getVerifiedReflectionsApi(status),
     enabled,
   });
 };
@@ -106,7 +107,11 @@ export const useUpdateDispatchReport = () => {
 };
 
 // 9. Hook Socket realtime tự động reload khi có thông báo mới liên quan đến điều chuyển
-export const useDispatchSocket = (refetch: () => void) => {
+export const useDispatchSocket = (
+  refetch: () => void,
+  onPatrolLocationUpdated?: (data: { id: number; lat: number; lng: number }) => void,
+  onNotification?: (noti: any) => void
+) => {
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (!token) return;
@@ -118,16 +123,33 @@ export const useDispatchSocket = (refetch: () => void) => {
     });
 
     socket.on("newNotification", (noti: any) => {
+      if (onNotification) {
+        onNotification(noti);
+      }
       if (
         noti?.type?.startsWith("DISPATCH_") ||
-        noti?.title?.includes("điều chuyển")
+        noti?.type?.startsWith("PATROL_") ||
+        noti?.type?.startsWith("REFLECTION_") ||
+        noti?.title?.includes("điều chuyển") ||
+        noti?.title?.includes("tuần tra")
       ) {
         refetch();
       }
     });
 
+    if (onPatrolLocationUpdated) {
+      socket.on("patrol_location_updated", onPatrolLocationUpdated);
+    }
+
     return () => {
       socket.disconnect();
     };
-  }, [refetch]);
+  }, [refetch, onPatrolLocationUpdated, onNotification]);
+};
+
+// 10. Hook thúc giục cán bộ
+export const useNudgeDispatch = () => {
+  return useMutation({
+    mutationFn: nudgeDispatchApi,
+  });
 };

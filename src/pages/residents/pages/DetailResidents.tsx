@@ -47,15 +47,7 @@ import {
 } from "recharts";
 import { HouseTypeLabel } from "../constants";
 import type { HouseType } from "../enum";
-import { useResidentById, useResidentVerificationHistory } from "../hooks";
-import type { ResidentVerificationHistoryItem } from "../apis";
-import {
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  CloseCircleOutlined,
-  CalendarOutlined,
-  PhoneOutlined,
-} from "@ant-design/icons";
+import { useResidentById } from "../hooks";
 
 const categoryConfig: Record<DamageCategory, { label: string; color: string }> =
   {
@@ -89,7 +81,7 @@ export default function DetailResidents() {
   const resident = data?.data;
   const damages = resident?.floodDamages || [];
 
-  const { data: verificationHistory, isLoading: verifyLoading } = useResidentVerificationHistory(resident?.phoneNumber);
+
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
   const isAdminOrManager =
@@ -97,31 +89,39 @@ export default function DetailResidents() {
     user?.role?.roleCode === Role.MANAGER;
 
   const stats = useMemo(() => {
-    if (!damages) return null;
-    const totalEstimatedValue = damages.reduce(
-      (sum, d) => sum + (d.estimatedValue || 0),
+    const dList = damages || [];
+    const totalEstimatedValue = dList.reduce(
+      (sum, d) => sum + Number(d.estimatedValue || 0),
       0,
     );
-    const totalInjured = damages.reduce(
-      (sum, d) => sum + (d.injuredCount || 0),
+    const totalInjured = dList.reduce(
+      (sum, d) => sum + Number(d.injuredCount || 0),
       0,
     );
-    const totalDeaths = damages.reduce(
-      (sum, d) => sum + (d.deathCount || 0),
+    const totalDeaths = dList.reduce(
+      (sum, d) => sum + Number(d.deathCount || 0),
       0,
     );
-    const uniqueReflections = new Set(
-      damages.map((d) => d.reflectionId).filter(Boolean),
-    ).size;
+    const uniqueReflections = resident?.reflections?.length || 0;
+
+    const reflections = resident?.reflections || [];
+    const resolvedReflections = reflections.filter(
+      (r) => r.status === "RESOLVED" || r.status === "COMPLETED"
+    ).length;
+    const rejectedReflections = reflections.filter(
+      (r) => r.status === "REJECTED"
+    ).length;
 
     return {
       totalEstimatedValue,
       totalInjured,
       totalDeaths,
       uniqueReflections,
-      totalDamages: damages.length,
+      resolvedReflections,
+      rejectedReflections,
+      totalDamages: dList.length,
     };
-  }, [damages]);
+  }, [damages, resident?.reflections]);
 
   const [timeRange, setTimeRange] = useState<"week" | "month" | "year">("year");
 
@@ -142,7 +142,7 @@ export default function DetailResidents() {
         if (now.diff(dDate, "day") <= 6 && now.diff(dDate, "day") >= 0) {
           const dateStr = dDate.format("DD/MM");
           if (aggregated[dateStr] !== undefined) {
-            aggregated[dateStr] += d.estimatedValue || 0;
+            aggregated[dateStr] += Number(d.estimatedValue || 0);
           }
         }
       });
@@ -158,10 +158,12 @@ export default function DetailResidents() {
         const dDate = dayjs(d.createdAt);
         if (dDate.isSame(now, "month")) {
           const date = dDate.date();
-          if (date <= 7) aggregated["Tuần 1"] += d.estimatedValue || 0;
-          else if (date <= 14) aggregated["Tuần 2"] += d.estimatedValue || 0;
-          else if (date <= 21) aggregated["Tuần 3"] += d.estimatedValue || 0;
-          else aggregated["Tuần 4"] += d.estimatedValue || 0;
+          if (date <= 7) aggregated["Tuần 1"] += Number(d.estimatedValue || 0);
+          else if (date <= 14)
+            aggregated["Tuần 2"] += Number(d.estimatedValue || 0);
+          else if (date <= 21)
+            aggregated["Tuần 3"] += Number(d.estimatedValue || 0);
+          else aggregated["Tuần 4"] += Number(d.estimatedValue || 0);
         }
       });
     } else {
@@ -172,7 +174,9 @@ export default function DetailResidents() {
       damages.forEach((d) => {
         const dDate = dayjs(d.createdAt);
         if (dDate.isSame(now, "year")) {
-          aggregated[`Tháng ${dDate.month() + 1}`] += d.estimatedValue || 0;
+          aggregated[`Tháng ${dDate.month() + 1}`] += Number(
+            d.estimatedValue || 0,
+          );
         }
       });
     }
@@ -265,7 +269,7 @@ export default function DetailResidents() {
   ];
 
   return (
-    <div className="w-full flex flex-col gap-4">
+    <div className="w-full flex flex-col gap-4 bg-[#FFFFFF] p-4 rounded-lg shadow-lg">
       {/* Header */}
       <div className="flex items-center gap-2 pb-2">
         <Button
@@ -276,8 +280,8 @@ export default function DetailResidents() {
         />
         <h1 className="text-xl font-bold m-0">Chi tiết hộ dân</h1>
       </div>
-      {/* Block 4: Biểu đồ thống kê */}
-      {isAdminOrManager && (
+      {/* Block 4: Biểu đồ thống kê - Tạm ẩn theo yêu cầu */}
+      {/* {isAdminOrManager && damages.length > 0 && (
         <Card
           title="Thống kê thiệt hại ước tính"
           className="shadow-sm rounded-xl border border-gray-100"
@@ -337,50 +341,38 @@ export default function DetailResidents() {
             )}
           </div>
         </Card>
-      )}
+      )} */}
       {/* Statistics for Admin/Manager */}
-      {isAdminOrManager && stats && (
-        <Card className="shadow-sm rounded-xl border border-gray-100 bg-blue-50/20">
-          <Row gutter={[16, 16]}>
-            <Col xs={12} sm={8} md={4}>
-              <Statistic
-                title="Số lượng phản ánh"
-                value={stats.uniqueReflections}
-                valueStyle={{ color: "#3f8600", fontWeight: "bold" }}
-              />
-            </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Statistic
-                title="Số vụ thiệt hại"
-                value={stats.totalDamages}
-                valueStyle={{ color: "#cf1322", fontWeight: "bold" }}
-              />
-            </Col>
-            <Col xs={24} sm={16} md={8}>
-              <Statistic
-                title="Tổng giá trị thiệt hại ước tính"
-                value={stats.totalEstimatedValue}
-                suffix="VND"
-                valueStyle={{ color: "#1677ff", fontWeight: "bold" }}
-              />
-            </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Statistic
-                title="Bị thương"
-                value={stats.totalInjured}
-                valueStyle={{ color: "#faad14", fontWeight: "bold" }}
-              />
-            </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Statistic
-                title="Tử vong"
-                value={stats.totalDeaths}
-                valueStyle={{ color: "#ff4d4f", fontWeight: "bold" }}
-              />
-            </Col>
-          </Row>
-        </Card>
-      )}
+      {isAdminOrManager &&
+        resident?.reflections &&
+        resident.reflections.length > 0 &&
+        stats && (
+          <Card className="shadow-sm rounded-xl border border-gray-100 bg-blue-50/20">
+            <Row gutter={[16, 16]}>
+              <Col xs={24} sm={8} md={8}>
+                <Statistic
+                  title="Tổng số phản ánh"
+                  value={stats.uniqueReflections}
+                  valueStyle={{ color: "#1677ff", fontWeight: "bold" }}
+                />
+              </Col>
+              <Col xs={24} sm={8} md={8}>
+                <Statistic
+                  title="Đã xử lý"
+                  value={stats.resolvedReflections}
+                  valueStyle={{ color: "#3f8600", fontWeight: "bold" }}
+                />
+              </Col>
+              <Col xs={24} sm={8} md={8}>
+                <Statistic
+                  title="Bị từ chối"
+                  value={stats.rejectedReflections}
+                  valueStyle={{ color: "#cf1322", fontWeight: "bold" }}
+                />
+              </Col>
+            </Row>
+          </Card>
+        )}
 
       {/* 2 Blocks: Small screens = 1 column (vertical), Large screens = 2 columns (horizontal) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
@@ -418,6 +410,16 @@ export default function DetailResidents() {
             <Descriptions.Item label="Số tầng">
               {resident?.numberOfFloors || "0"}
             </Descriptions.Item>
+            {resident?.user && (
+              <Descriptions.Item label="Tài khoản liên kết">
+                <Tag
+                  color="blue"
+                  className="font-semibold text-[13px] px-2 py-0.5 rounded-md"
+                >
+                  👤 {resident.user.fullName} ({resident.user.phoneNumber})
+                </Tag>
+              </Descriptions.Item>
+            )}
           </Descriptions>
         </Card>
 
@@ -492,7 +494,7 @@ export default function DetailResidents() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
             <WMSTileLayer
-              url="http://localhost:8000/geoserver/tambinh/wms"
+              url={`${import.meta.env.VITE_API_URL_GEOSERVER}/tambinh/wms`}
               layers="tambinh:tam-binh_map"
               format="image/png"
               transparent={true}
@@ -517,16 +519,11 @@ export default function DetailResidents() {
       </Card>
 
       {/* Block 5: Thiệt hại liên quan */}
-      <Card
-        title="Danh sách thiệt hại liên quan"
-        className="shadow-sm rounded-xl border border-gray-100"
-      >
-        {damages.length === 0 ? (
-          <Empty
-            description="Chưa có thông tin thiệt hại nào cho hộ dân này"
-            className="py-8"
-          />
-        ) : (
+      {damages.length > 0 && (
+        <Card
+          title="Danh sách thiệt hại liên quan"
+          className="shadow-sm rounded-xl border border-gray-100"
+        >
           <Table
             dataSource={damages}
             columns={damageColumns}
@@ -535,119 +532,89 @@ export default function DetailResidents() {
             size="middle"
             bordered
           />
-        )}
-      </Card>
+        </Card>
+      )}
 
-      {/* Block 6: Lịch sử xác thực */}
-      <Card
-        title={
-          <div className="flex items-center gap-2">
-            <span>🔐 Lịch sử xác thực cư dân</span>
-            {verificationHistory?.total ? (
-              <Tag color="blue">{verificationHistory.total} lần</Tag>
-            ) : null}
-          </div>
-        }
-        className="shadow-sm rounded-xl border border-gray-100"
-      >
-        {verifyLoading ? (
-          <div className="flex justify-center py-8">
-            <Spin tip="Đang tải lịch sử xác thực..." />
-          </div>
-        ) : !verificationHistory?.data?.length ? (
-          <Empty
-            description="Chưa có lịch sử xác thực nào cho hộ dân này"
-            className="py-6"
-          />
-        ) : (
-          <div className="space-y-4">
-            {/* Timeline view */}
-            <Timeline
-              items={(verificationHistory.data as ResidentVerificationHistoryItem[]).slice(0, 5).map((item) => ({
-                color: item.status === 'APPROVED' ? 'green' : item.status === 'REJECTED' ? 'red' : 'orange',
-                dot: item.status === 'APPROVED'
-                  ? <CheckCircleOutlined />
-                  : item.status === 'REJECTED'
-                    ? <CloseCircleOutlined />
-                    : <ClockCircleOutlined />,
-                children: (
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {item.status === 'APPROVED'
-                        ? <Tag color="success" icon={<CheckCircleOutlined />}>Đã duyệt</Tag>
-                        : item.status === 'REJECTED'
-                          ? <Tag color="error" icon={<CloseCircleOutlined />}>Từ chối</Tag>
-                          : <Tag color="warning" icon={<ClockCircleOutlined />}>Chờ duyệt</Tag>
-                      }
-                      <span className="text-blue-600 text-sm font-medium">Hệ thống xác thực cư dân Phường Tam Bình</span>
-                      {item.isMatchedContact
-                        ? <Tag color="success" icon={<CheckCircleOutlined />} className="text-xs">Khớp hệ thống</Tag>
-                        : <Tag color="error" icon={<CloseCircleOutlined />} className="text-xs">SĐT Lạ</Tag>
-                      }
-                    </div>
-                    <div className="text-gray-500 text-sm mt-1">
-                      <PhoneOutlined className="mr-1" />{item.phoneNumber}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      <CalendarOutlined className="mr-1" />
-                      Gửi: {dayjs(item.createdAt).format('HH:mm DD/MM/YYYY')}
-                      {item.updatedAt && ` • Xử lý: ${dayjs(item.updatedAt).format('HH:mm DD/MM/YYYY')}`}
-                    </div>
-                  </div>
-                ),
-              }))}
-            />
-
-            {/* Full table */}
+      {/* Block 5.5: Phản ánh liên quan */}
+      {isAdminOrManager &&
+        resident?.reflections &&
+        resident.reflections.length > 0 && (
+          <Card
+            title="Danh sách phản ánh của người dân"
+            className="shadow-sm rounded-xl border border-gray-100"
+          >
             <Table
-              dataSource={verificationHistory.data as ResidentVerificationHistoryItem[]}
-              rowKey="id"
-              size="small"
-              bordered
-              pagination={{ pageSize: 5 }}
+              dataSource={resident.reflections}
               columns={[
                 {
-                  title: 'Mã đơn',
-                  dataIndex: 'id',
-                  width: 80,
-                  render: (val: number) => <span className="text-gray-400 text-xs">#{val}</span>,
+                  title: "Mã phản ánh",
+                  dataIndex: "id",
+                  width: 120,
+                  render: (id: number) => (
+                    <Button
+                      type="link"
+                      onClick={() => navigate(`/reflections/${id}`)}
+                      style={{ padding: 0, fontWeight: 600 }}
+                    >
+                      #{id}
+                    </Button>
+                  ),
                 },
                 {
-                  title: 'Trạng thái',
-                  dataIndex: 'status',
+                  title: "Tiêu đề",
+                  dataIndex: "title",
+                  render: (text: string) => text || "Không có tiêu đề",
+                },
+                {
+                  title: "Nội dung",
+                  dataIndex: "content",
+                  ellipsis: true,
+                },
+                {
+                  title: "Trạng thái",
+                  dataIndex: "status",
                   render: (status: string) => {
-                    if (status === 'APPROVED') return <Tag icon={<CheckCircleOutlined />} color="success">Đã duyệt</Tag>;
-                    if (status === 'REJECTED') return <Tag icon={<CloseCircleOutlined />} color="error">Từ chối</Tag>;
-                    return <Tag icon={<ClockCircleOutlined />} color="warning">Chờ duyệt</Tag>;
+                    const ReflectionStatusLabel: Record<string, string> = {
+                      PENDING: "Chờ xác minh",
+                      VERIFIED: "Đã xác minh",
+                      ASSIGNED: "Đã giao việc",
+                      IN_PROGRESS: "Đang xử lý",
+                      COMPLETED: "Đã hoàn thành",
+                      RESOLVED: "Đã giải quyết",
+                      REJECTED: "Đã từ chối",
+                    };
+                    const ReflectionStatusColor: Record<string, string> = {
+                      PENDING: "orange",
+                      VERIFIED: "blue",
+                      ASSIGNED: "cyan",
+                      IN_PROGRESS: "processing",
+                      COMPLETED: "success",
+                      RESOLVED: "green",
+                      REJECTED: "error",
+                    };
+                    return (
+                      <Tag color={ReflectionStatusColor[status] || "default"}>
+                        {ReflectionStatusLabel[status] || status}
+                      </Tag>
+                    );
                   },
                 },
                 {
-                  title: 'Bên xác thực',
-                  key: 'verifier',
-                  render: () => <span className="text-blue-600 font-medium text-sm">HT Xác thực cư dân</span>,
-                },
-                {
-                  title: 'Kết quả đối chiếu',
-                  dataIndex: 'isMatchedContact',
-                  render: (matched: boolean, record: ResidentVerificationHistoryItem) => matched
-                    ? <Tag color="success" icon={<CheckCircleOutlined />}>Khớp hệ thống</Tag>
-                    : <Tag color="error" icon={<CloseCircleOutlined />} title={record.matchedMessage}>SĐT Lạ</Tag>,
-                },
-                {
-                  title: 'Ngày gửi',
-                  dataIndex: 'createdAt',
-                  render: (date: string) => date ? dayjs(date).format('DD/MM/YYYY HH:mm') : '—',
-                },
-                {
-                  title: 'Ngày xử lý',
-                  dataIndex: 'updatedAt',
-                  render: (date: string) => date ? dayjs(date).format('DD/MM/YYYY HH:mm') : '—',
+                  title: "Ngày gửi",
+                  dataIndex: "createdAt",
+                  render: (date: string) =>
+                    dayjs(date).format("DD/MM/YYYY HH:mm"),
                 },
               ]}
+              rowKey="id"
+              pagination={{ pageSize: 5 }}
+              size="middle"
+              bordered
             />
-          </div>
+          </Card>
         )}
-      </Card>
+
+
     </div>
   );
 }

@@ -20,11 +20,13 @@ export interface DispatchReport {
   status: DispatchReportStatus;
   reflectionId: number;
   assignedBy: number;
-  assignedTo: number;
+  assignedTo?: number;
+  customHandler?: string;
   assignedAt: string;
   expiredAt: string;
   acceptedAt?: string;
   completedAt?: string;
+  expectedTime?: string;
   title?: string;
   description?: string;
   note?: string;
@@ -43,6 +45,11 @@ export interface DispatchReport {
     address?: string;
     status: string;
     imageUrl?: string[];
+    lat?: number;
+    lng?: number;
+    patrolLat?: number;
+    patrolLng?: number;
+    needReinforcement?: boolean;
     user?: {
       fullName?: string;
       phoneNumber?: string;

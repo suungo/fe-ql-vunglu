@@ -12,8 +12,14 @@ import {
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { categoryOptions } from "../constants";
-import { useFloodDamageDetail, useUpdateFloodDamage } from "../hooks";
+import {
+  useFloodDamageDetail,
+  useUpdateFloodDamage,
+  useCreateFloodDamage,
+} from "../hooks";
 import type { IUpdateFloodDamageRequest } from "../interfaces";
+import { getResolvedReflectionsApi } from "@/pages/reflection/api";
+import { useQuery } from "@tanstack/react-query";
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -28,6 +34,14 @@ export default function FormFloodDamages() {
   const { data: floodDamageDetail } = useFloodDamageDetail(
     id ? Number(id) : undefined,
   );
+
+  const { data: resolvedReflectionsResponse, isLoading: isLoadingReflections } =
+    useQuery({
+      queryKey: ["resolvedReflections"],
+      queryFn: getResolvedReflectionsApi,
+      enabled: !id,
+    });
+  const resolvedReflections = resolvedReflectionsResponse?.data || [];
 
   useEffect(() => {
     if (floodDamageDetail?.data && id) {
@@ -44,7 +58,8 @@ export default function FormFloodDamages() {
   }, [floodDamageDetail, id, form]);
 
   const updateFloodDamage = useUpdateFloodDamage();
-  const handleSubmit = async (values: IUpdateFloodDamageRequest) => {
+  const createFloodDamage = useCreateFloodDamage();
+  const handleSubmit = async (values: any) => {
     setIsLoading(true);
 
     try {
@@ -58,11 +73,18 @@ export default function FormFloodDamages() {
           "VND",
         ),
       };
-      const response = await updateFloodDamage.mutateAsync({
-        id: Number(id),
-        data: data,
-      });
-      if (response?.statusCode === 200) {
+
+      let response;
+      if (id) {
+        response = await updateFloodDamage.mutateAsync({
+          id: Number(id),
+          data: data,
+        });
+      } else {
+        response = await createFloodDamage.mutateAsync(data);
+      }
+
+      if (response?.statusCode === 200 || response?.statusCode === 201) {
         notification.success({
           title: "Thành công",
           description: response.message,
@@ -82,24 +104,54 @@ export default function FormFloodDamages() {
 
   return (
     <div className="bg-white rounded-xl w-full! p-4 shadow">
-      <Title level={4}>Cập nhật thiệt hại</Title>
+      <Title level={4}>{id ? "Cập nhật thiệt hại" : "Báo thiệt hại mới"}</Title>
       <Form form={form} layout="vertical" onFinish={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <Form.Item
-            name="id"
-            label={
-              <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
-                Mã thiệt hại
-                <span className="text-[#D32F2F] ml-1">*</span>
-              </p>
-            }
-            required={false}
-            rules={[
-              { required: true, message: "Vui lòng chọn loại thiệt hại" },
-            ]}
-          >
-            <Input disabled className="h-9! w-full" />
-          </Form.Item>
+          {!id && (
+            <Form.Item
+              required={false}
+              name="reflectionId"
+              label={
+                <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
+                  Sự cố liên kết
+                  <span className="text-[#D32F2F] ml-1">*</span>
+                </p>
+              }
+              rules={[
+                { required: true, message: "Vui lòng chọn sự cố liên kết" },
+              ]}
+            >
+              <Select
+                placeholder="Chọn sự cố"
+                allowClear
+                autoFocus
+                className="h-9! w-full"
+                loading={isLoadingReflections}
+              >
+                {resolvedReflections.map((r: any) => (
+                  <Option key={r.id} value={r.id}>
+                    {`[ID: ${r.id}] ${r.title}`}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
+
+          {id && (
+            <Form.Item
+              name="id"
+              label={
+                <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
+                  Mã thiệt hại
+                  <span className="text-[#D32F2F] ml-1">*</span>
+                </p>
+              }
+              required={false}
+            >
+              <Input disabled className="h-9! w-full" />
+            </Form.Item>
+          )}
+
           <Form.Item
             name="damageCategory"
             validateTrigger={["onChange", "onBlur"]}
@@ -194,9 +246,11 @@ export default function FormFloodDamages() {
           </Form.Item>
         )}
 
-        <Form.Item hidden name="reflectionId">
-          <InputNumber />
-        </Form.Item>
+        {id && (
+          <Form.Item hidden name="reflectionId">
+            <InputNumber />
+          </Form.Item>
+        )}
 
         <div className="flex justify-end gap-1">
           <Button

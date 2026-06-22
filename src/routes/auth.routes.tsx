@@ -1,6 +1,6 @@
 import LazyLoad from "@/components/base/lazyLoad/index";
 import React from "react";
-import type { RouteObject } from "react-router-dom";
+import { Navigate, type RouteObject } from "react-router-dom";
 import GuestRoute from "./guestRoute.routes";
 
 const LoginPage = React.lazy(() => import("@/pages/auth/login/pages"));
@@ -12,6 +12,15 @@ const PolicyPage = React.lazy(() => import("@/pages/auth/policy"));
 const MessagesRealtimePage = React.lazy(
   () => import("@/pages/messageRealtime/pages/MessagesRealtime"),
 );
+
+// Hợp phần bảo vệ router dựa trên vai trò chọn lựa (Người dân / Cán bộ)
+const RoleProtectedRoute = ({ children, allowedRoles }: { children: JSX.Element; allowedRoles: string[] }) => {
+  const selectedRole = localStorage.getItem("selectedRole") || "resident";
+  if (!allowedRoles.includes(selectedRole)) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
 
 export const authRoutes: RouteObject[] = [
   {
@@ -28,7 +37,9 @@ export const authRoutes: RouteObject[] = [
     element: (
       <LazyLoad>
         <GuestRoute>
-          <ResetPasswordPage />
+          <RoleProtectedRoute allowedRoles={["staff"]}>
+            <ResetPasswordPage />
+          </RoleProtectedRoute>
         </GuestRoute>
       </LazyLoad>
     ),
@@ -38,7 +49,9 @@ export const authRoutes: RouteObject[] = [
     element: (
       <LazyLoad>
         <GuestRoute>
-          <RegisterPage />
+          <RoleProtectedRoute allowedRoles={["staff"]}>
+            <RegisterPage />
+          </RoleProtectedRoute>
         </GuestRoute>
       </LazyLoad>
     ),
@@ -55,7 +68,9 @@ export const authRoutes: RouteObject[] = [
     path: "/messages-realtime",
     element: (
       <LazyLoad>
-        <MessagesRealtimePage />
+        <RoleProtectedRoute allowedRoles={["staff"]}>
+          <MessagesRealtimePage />
+        </RoleProtectedRoute>
       </LazyLoad>
     ),
   },

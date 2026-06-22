@@ -19,9 +19,11 @@ export interface Reflection {
   response?: string;
   respondedAt?: string;
   user?: {
+    id?: number;
     fullName?: string;
     username?: string;
     role?: { roleCode?: string };
+    reputationPoints?: number;
   };
 
   // ── Workflow fields ──────────────────────────────────
@@ -40,6 +42,9 @@ export interface Reflection {
   inspectorAcceptedAt?: string;
   patrolAcceptedAt?: string;
   managedBy?: number;
+  isPublishedOnMap?: boolean;
+  publishedAt?: string;
+  originalReflectionId?: number;
 }
 
 export interface CreateReflection {
@@ -54,7 +59,8 @@ export interface CreateReflection {
   priority: Priority; // Mức độ
   // Loại sự cố
   typeOfIncident: EventType;
-
+  isPublishedOnMap?: boolean;
+  originalReflectionId?: number;
 }
 
 export interface UpdateReflection extends CreateReflection {

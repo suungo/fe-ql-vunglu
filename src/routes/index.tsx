@@ -1,6 +1,6 @@
 import DefaultLayout from "@/layouts/DefaultLayout";
 import React from "react";
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import LazyLoad from "@/components/base/lazyLoad";
 import { accountRoutes } from "./account.routes";
@@ -13,19 +13,18 @@ import { profileRoutes } from "./profile.routes";
 import ProtectedRoute from "./protectedRoute.routes";
 import { reflectionRoutes } from "./reflection.routes";
 import { residentsRoutes } from "./residents.routes";
-import { verificationRoutes } from "./verification.routes";
 
-const OverviewSplash = React.lazy(() => import("@/pages/overview/pages"));
 const NotFoundPage = React.lazy(() => import("@/pages/not-found"));
+
+const RootRedirect = () => {
+  const accessToken = localStorage.getItem("accessToken");
+  return <Navigate to={accessToken ? "/app/dashboard" : "/login"} replace />;
+};
 
 const routers = createBrowserRouter([
   {
     path: "/",
-    element: (
-      <LazyLoad>
-        <OverviewSplash />
-      </LazyLoad>
-    ),
+    element: <RootRedirect />,
   },
   {
     path: "/app",
@@ -43,7 +42,6 @@ const routers = createBrowserRouter([
       ...residentsRoutes,
       ...floodDamagesRoutes,
       ...reflectionRoutes,
-      ...verificationRoutes,
       ...dispatchRoutes,
       ...accountRoutes,
     ],

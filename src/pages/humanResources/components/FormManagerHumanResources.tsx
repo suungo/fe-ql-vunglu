@@ -1,14 +1,32 @@
 import { formRules } from "@/components/constants";
 import { Gender } from "@/enums";
-import { useHRVerificationSocket } from "@/hooks/useHRVerificationSocket";
-import { Button, DatePicker, Form, Input, notification, Select } from "antd";
-import { HttpStatusCode } from "axios";
+import {
+  Button,
+  DatePicker,
+  Form,
+  Input,
+  notification,
+  Select,
+  Radio,
+  Upload,
+} from "antd";
+import axios, { HttpStatusCode } from "axios";
 import dayjs from "dayjs";
+import { Upload as UploadIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { updateHumanResource, getListHumanResource, getHRVerificationHistory } from "../api";
-import { SelectGender, SelectHumanResourcesPosition, SelectHumanResourcesStatus } from "../constants";
+import { BASE_URL } from "@/apis";
+import {
+  updateHumanResource,
+  getListHumanResource,
+  createHumanResource,
+} from "../api";
+import {
+  SelectGender,
+  SelectHumanResourcesPosition,
+  SelectHumanResourcesStatus,
+} from "../constants";
 import { useHumanResourceDetail } from "../hooks";
-import type { CreateHumanResources, UpdateHumanResources } from "../interfaces";
+import type { CreateHumanResources } from "../interfaces";
 import { HumanResourcesPosition } from "../enum";
 
 type Props = {
@@ -26,19 +44,60 @@ export default function FormManagerHumanResources({
 }: Props) {
   const [form] = Form.useForm<CreateHumanResources>();
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [fileList, setFileList] = useState<any[]>([]);
   const { data: detailData, isLoading: isLoadingHumanResource } =
     useHumanResourceDetail(Number(id));
-  const { emitNewHRRegistration } = useHRVerificationSocket();
+
+  const evidenceType = Form.useWatch("evidenceType", form) || "image";
+
+  const [provinces, setProvinces] = useState<{ code: number; name: string }[]>(
+    [],
+  );
+  const [wards, setWards] = useState<{ code: number; name: string }[]>([]);
+
+  const handleProvinceChange = (provinceName: string) => {
+    form.setFieldsValue({ ward: undefined } as any);
+    setWards([]);
+    if (!provinceName) return;
+
+    const selectedProvince = provinces.find((p) => p.name === provinceName);
+    if (!selectedProvince) return;
+
+    BASE_URL.get("/wards", { params: { provinceCode: selectedProvince.code } })
+      .then((res) => {
+        const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        setWards(list);
+      })
+      .catch(console.error);
+  };
 
   useEffect(() => {
     if (detailData?.data) {
+      let provinceValue = "";
+      let wardValue = "";
+      let detailAddressValue = "";
+      if (detailData.data.address) {
+        const parts = detailData.data.address
+          .split(",")
+          .map((p: string) => p.trim());
+        if (parts.length >= 3) {
+          provinceValue = parts[parts.length - 1];
+          wardValue = parts[parts.length - 2];
+          detailAddressValue = parts.slice(0, parts.length - 2).join(", ");
+        } else {
+          detailAddressValue = detailData.data.address;
+        }
+      }
+
       form.setFieldsValue({
         ...detailData.data,
+        province: provinceValue || undefined,
+        ward: wardValue || undefined,
+        detailAddress: detailAddressValue,
         dateBirth: detailData.data.dateBirth
           ? dayjs(detailData.data.dateBirth)
           : null,
-        // Thêm các trường select, date, ... cần format
-      });
+      } as any);
     }
   }, [detailData?.data, form]);
 
@@ -53,16 +112,20 @@ export default function FormManagerHumanResources({
   if (!detailData?.data && id) {
     return <div>Không tìm thấy thông tin nhân sự</div>;
   }
-  const handleLogin = async (
-    values: CreateHumanResources | UpdateHumanResources,
-  ) => {
+  const handleLogin = async (values: CreateHumanResources) => {
     setIsLoading(true);
     try {
       if (mode === "add") {
         // A. Kiểm tra trong hệ thống chính DA-TTTN
-        const activeCheck = await getListHumanResource(values.employeeCode, 1, 1);
+        const activeCheck = await getListHumanResource(
+          values.employeeCode,
+          1,
+          1,
+        );
         const codeExistsInActive = activeCheck?.data?.some(
-          (hr) => hr.employeeCode.trim().toLowerCase() === values.employeeCode.trim().toLowerCase()
+          (hr) =>
+            hr.employeeCode.trim().toLowerCase() ===
+            values.employeeCode.trim().toLowerCase(),
         );
 
         if (codeExistsInActive) {
@@ -74,47 +137,73 @@ export default function FormManagerHumanResources({
           setIsLoading(false);
           return;
         }
+      }
 
-        // B. Kiểm tra trong hệ thống xác thực (đang chờ duyệt hoặc đã duyệt)
+      let avatarUrl = undefined;
+      if (mode === "add" && values.evidenceFile) {
+        const formData = new FormData();
+        formData.append("file", values.evidenceFile);
         try {
-          const verifyCheck = await getHRVerificationHistory(values.employeeCode);
-          const hasPendingOrApproved = verifyCheck?.data?.some(
-            (item) => item.status === "PENDING" || item.status === "APPROVED"
+          const uploadRes = await BASE_URL.post<{ url: string }>(
+            "/upload/file",
+            formData,
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+                "Content-Type": "multipart/form-data",
+              },
+            },
           );
-
-          if (hasPendingOrApproved) {
-            notification.error({
-              message: "Yêu cầu đã tồn tại",
-              title: "Yêu cầu đã tồn tại",
-              description: `Mã nhân sự "${values.employeeCode}" đã có hồ sơ đang chờ duyệt hoặc đã xác thực trên hệ thống xác minh.`,
-            });
-            setIsLoading(false);
-            return;
+          if (uploadRes?.data?.url) {
+            avatarUrl = uploadRes.data.url;
           }
-        } catch (e) {
-          console.warn("Skip verification history check error", e);
+        } catch (uploadError) {
+          console.error("Upload evidence file failed:", uploadError);
+          notification.error({
+            message: "Tải file lên thất bại",
+            description: "Không thể tải tài liệu minh chứng lên Cloudinary.",
+          });
+          setIsLoading(false);
+          return;
         }
       }
 
       const creator = JSON.parse(localStorage.getItem("user") || "null");
-      const payload = {
-        ...values,
+      const {
+        province,
+        ward,
+        detailAddress,
+        evidenceFile,
+        evidenceType,
+        ...otherValues
+      } = values as any;
+      const combinedAddress = `${detailAddress}, ${ward}, ${province}`;
+      const payload: any = {
+        ...otherValues,
+        address: combinedAddress,
         dateBirth: values.dateBirth
           ? dayjs(values.dateBirth).toISOString()
           : undefined,
-        creator: creator ? {
-          id: creator.id,
-          fullName: creator.fullName,
-          phoneNumber: creator.phoneNumber,
-          email: creator.email,
-          employeeCode: creator.employeeCode,
-          position: creator.role?.roleName || creator.role?.roleCode || "Quản lý",
-        } : null,
+        creator: creator
+          ? {
+              id: creator.id,
+              fullName: creator.fullName,
+              phoneNumber: creator.phoneNumber,
+              email: creator.email,
+              employeeCode: creator.employeeCode,
+              position:
+                creator.role?.roleName || creator.role?.roleCode || "Quản lý",
+            }
+          : null,
       };
- 
+
+      if (avatarUrl) {
+        payload.avatar = avatarUrl;
+      }
+
       if (mode === "edit" && id) {
         const response = await updateHumanResource(
-          payload as UpdateHumanResources,
+          payload as CreateHumanResources,
           id,
         );
         if (
@@ -129,15 +218,20 @@ export default function FormManagerHumanResources({
           refetch();
         }
       } else {
-        // Thay vì gọi createHumanResource, gửi data tới hệ thống duyệt
-        emitNewHRRegistration(payload);
-        notification.success({
-          title: "Đã gửi yêu cầu",
-          description:
-            "Yêu cầu đăng ký nhân sự đã được gửi đến hệ thống quản lý để chờ duyệt.",
-        });
-        onCancel();
-        form.resetFields();
+        const response = await createHumanResource(payload);
+        if (
+          response?.statusCode === 201 ||
+          response?.statusCode === HttpStatusCode.Ok
+        ) {
+          notification.success({
+            title: "Thành Công",
+            description: response?.message || "Thêm nhân sự thành công",
+          });
+          onCancel();
+          refetch();
+          form.resetFields();
+          setFileList([]);
+        }
       }
     } catch (error: unknown) {
       const errorMsg =
@@ -154,6 +248,7 @@ export default function FormManagerHumanResources({
       });
       setIsLoading(false);
       form.resetFields();
+      setFileList([]);
       onCancel();
     } finally {
       setIsLoading(false);
@@ -167,7 +262,7 @@ export default function FormManagerHumanResources({
         onFinish={handleLogin}
         form={form}
       >
-        <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+        <div className="grid lg:grid-cols-2 grid-cols-1 lg:gap-4">
           <Form.Item<CreateHumanResources>
             rules={formRules.code()}
             name="employeeCode"
@@ -180,7 +275,12 @@ export default function FormManagerHumanResources({
             }
             validateTrigger={["onBlur", "onChange"]}
           >
-            <Input className="w-full h-10!" placeholder="Nhập mã nhân sự" />
+            <Input
+              allowClear
+              autoFocus
+              className="w-full h-10!"
+              placeholder="Nhập mã nhân sự"
+            />
           </Form.Item>
           <Form.Item<CreateHumanResources>
             rules={formRules.fullName()}
@@ -194,10 +294,14 @@ export default function FormManagerHumanResources({
             }
             validateTrigger={["onBlur", "onChange"]}
           >
-            <Input className="w-full h-10!" placeholder="Nhập tên nhân sự" />
+            <Input
+              allowClear
+              className="w-full h-10!"
+              placeholder="Nhập tên nhân sự"
+            />
           </Form.Item>
         </div>
-        <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+        <div className="grid lg:grid-cols-2 grid-cols-1 lg:gap-4">
           <Form.Item<CreateHumanResources>
             rules={formRules.email()}
             name="email"
@@ -210,7 +314,11 @@ export default function FormManagerHumanResources({
             }
             validateTrigger={["onBlur", "onChange"]}
           >
-            <Input className="w-full h-10!" placeholder="Nhập email" />
+            <Input
+              allowClear
+              className="w-full h-10!"
+              placeholder="Nhập email"
+            />
           </Form.Item>
           <Form.Item<CreateHumanResources>
             rules={formRules.phone()}
@@ -224,23 +332,32 @@ export default function FormManagerHumanResources({
             }
             validateTrigger={["onBlur", "onChange"]}
           >
-            <Input className="w-full h-10!" placeholder="Nhập số điện thoại" />
+            <Input
+              allowClear
+              className="w-full h-10!"
+              placeholder="Nhập số điện thoại"
+            />
           </Form.Item>
         </div>
-        <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
-          <Form.Item<CreateHumanResources>
-            rules={formRules.address()}
-            name="address"
+
+        <div className="grid lg:grid-cols-2 grid-cols-1 lg:gap-4">
+          <Form.Item
             required={false}
+            rules={formRules.address()}
+            name="detailAddress"
             label={
               <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
-                Địa chỉ
+                Địa chỉ chi tiết
                 <span className="text-[#D32F2F] ml-1">*</span>
               </p>
             }
             validateTrigger={["onBlur", "onChange"]}
           >
-            <Input className="w-full h-10!" placeholder="Nhập địa chỉ" />
+            <Input
+              allowClear
+              className="w-full h-10!"
+              placeholder="Nhập số nhà, tên đường..."
+            />
           </Form.Item>
           <Form.Item<CreateHumanResources>
             rules={[{ required: true, message: "Vui lòng nhập chức vụ" }]}
@@ -255,13 +372,16 @@ export default function FormManagerHumanResources({
             validateTrigger={["onBlur", "onChange"]}
           >
             <Select
+              showSearch
+              optionFilterProp="label"
               className="w-full h-10!"
+              allowClear
               options={SelectHumanResourcesPosition}
               placeholder="Nhập chức vụ"
             />
           </Form.Item>
         </div>
-        <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+        <div className="grid lg:grid-cols-2 grid-cols-1 lg:gap-4">
           <Form.Item<CreateHumanResources>
             rules={[{ required: true, message: "Vui lòng nhập giới tính" }]}
             name="gender"
@@ -275,7 +395,10 @@ export default function FormManagerHumanResources({
             validateTrigger={["onBlur", "onChange"]}
           >
             <Select
+              showSearch
+              optionFilterProp="label"
               className="w-full h-10!"
+              allowClear
               options={SelectGender}
               placeholder="Nhập giới tính"
             />
@@ -293,9 +416,12 @@ export default function FormManagerHumanResources({
             validateTrigger={["onBlur", "onChange"]}
           >
             <Select
+              showSearch
+              optionFilterProp="label"
               className="w-full h-10!"
               options={SelectHumanResourcesStatus}
               placeholder="Nhập trạng thái"
+              allowClear
             />
           </Form.Item>
         </div>
@@ -315,8 +441,66 @@ export default function FormManagerHumanResources({
             format="DD/MM/YYYY"
             className="w-full h-10!"
             placeholder="Nhập ngày sinh"
+            allowClear
           />
         </Form.Item>
+        {mode === "add" && (
+          <div className="grid lg:grid-cols-2 grid-cols-1 gap-4">
+            <Form.Item<CreateHumanResources>
+              name="evidenceType"
+              initialValue="image"
+              label={
+                <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
+                  Loại tài liệu minh chứng
+                </p>
+              }
+            >
+              <Radio.Group className="w-full">
+                <Radio value="image">Hình ảnh</Radio>
+                <Radio value="document">Văn bản</Radio>
+              </Radio.Group>
+            </Form.Item>
+
+            <Form.Item<CreateHumanResources>
+              name="evidenceFile"
+              label={
+                <p className="lg:text-[16px] text-[14px] text-[#464646] font-medium">
+                  Minh chứng kèm theo
+                </p>
+              }
+              valuePropName="file"
+              getValueFromEvent={(e) => {
+                if (Array.isArray(e)) return e;
+                return e && e.fileList && e.fileList[0]?.originFileObj;
+              }}
+            >
+              <Upload
+                maxCount={1}
+                beforeUpload={() => false}
+                fileList={fileList}
+                accept={
+                  evidenceType === "image"
+                    ? ".jpg,.jpeg,.png,.gif"
+                    : ".pdf,.doc,.docx"
+                }
+                onChange={({ fileList: newList }) => {
+                  setFileList(newList.slice(-1));
+                }}
+              >
+                <Button
+                  className="w-full h-10! flex items-center justify-center gap-2"
+                  icon={<UploadIcon size={16} />}
+                >
+                  Chọn tệp (
+                  {evidenceType === "image"
+                    ? "Ảnh quyết định"
+                    : "Văn bản PDF/Word"}
+                  )
+                </Button>
+              </Upload>
+            </Form.Item>
+          </div>
+        )}
         <div>
           <Form.Item<CreateHumanResources>
             name="notes"
@@ -330,6 +514,7 @@ export default function FormManagerHumanResources({
             rules={[{ max: 1000, message: "Tối đa 1000 ký tự" }]}
           >
             <Input.TextArea
+              allowClear
               className="w-full"
               rows={3}
               placeholder="Nhập mô tả"

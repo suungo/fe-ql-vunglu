@@ -2,9 +2,17 @@ export interface RegisterRequest {
   phoneNumber: string;
   fullName: string;
   email: string;
+  cccd?: string;
   province: string;
   wards: string;
   address: string;
+  numberOfMembers?: number;
+  hasElderly?: string;
+  hasChildren?: string;
+  hasPregnantWomen?: string;
+  hasChronicDisease?: string;
+  houseType?: string;
+  hasBusiness?: string;
 }
 
 export interface Role {

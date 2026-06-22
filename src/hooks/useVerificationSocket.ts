@@ -53,7 +53,7 @@ export const useVerificationSocket = () => {
   }, []);
 
   /**
-   * Phát sự kiện báo có cư dân mới đăng ký
+   * Phát sự kiện báo có người dân mới đăng ký
    * Gọi hàm này sau khi createResident thành công
    */
   const emitNewResidentRegistration = (residentData: {

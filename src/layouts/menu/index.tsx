@@ -1,5 +1,6 @@
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { BASE_URL } from "@/apis";
 
 import {
   DashboardIcon,
@@ -13,6 +14,10 @@ import {
   ChevronLeft,
   ShieldCheck as ShieldCheckIcon,
   UserIcon,
+  TrendingUp,
+  Map as MapIcon,
+  Bell as BellIcon,
+  Award as AwardIcon,
 } from "lucide-react";
 
 type MenuItem = {
@@ -41,6 +46,11 @@ export default function Menu({
   collapsed = false,
   onToggleCollapse,
 }: MenuProps) {
+  useEffect(() => {
+    // Record page visit once when the menu (layout) mounts
+    BASE_URL.post("/statistics/visit").catch(() => {});
+  }, []);
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -61,6 +71,18 @@ export default function Menu({
       ),
       path: "/app/dashboard",
     },
+    {
+      key: "map",
+      label: "Bản đồ",
+      icon: (isActive: boolean) => (
+        <MapIcon
+          height={22}
+          width={22}
+          className={isActive ? "text-white" : "text-sky-400"}
+        />
+      ),
+      path: "/app/map",
+    },
 
     {
       key: "reflection",
@@ -70,30 +92,14 @@ export default function Menu({
       ),
       path: "/app/reflection-manager/list",
     },
+
     ...(profileData?.role.roleCode === Role.ADMIN ||
-    profileData?.role.roleCode === Role.LEADER ||
-    profileData?.role.roleCode === Role.MANAGER
-      ? [
-          {
-            key: "verification",
-            label: "Quản lý xác thực",
-            icon: (isActive: boolean) => (
-              <ShieldCheckIcon
-                height={22}
-                width={22}
-                className={isActive ? "text-white" : "text-sky-400"}
-              />
-            ),
-            path: "/app/verification-manager/list",
-          },
-        ]
-      : []),
-    ...(profileData?.role.roleCode === Role.ADMIN ||
-    profileData?.role.roleCode === Role.MANAGER
+    profileData?.role.roleCode === Role.MANAGER ||
+    profileData?.role.roleCode === Role.INSPECTOR
       ? [
           {
             key: "dispatch",
-            label: "Quản lý điều chuyển",
+            label: "Quản lý yêu cầu",
             icon: (isActive: boolean) => (
               <ArrowRightLeft
                 height={22}
@@ -105,23 +111,23 @@ export default function Menu({
           },
         ]
       : []),
-    // Chỉ hiển thị menu thiệt hại cho cư dân (RESIDENT)
-    // ADMIN/MANAGER/LEADER xem thiệt hại trong chi tiết cư dân
-    ...(profileData?.role.roleCode === Role.RESIDENT
-      ? [
-          {
-            key: "flood-damages",
-            label: "Quản lý thiệt hại",
-            icon: (isActive: boolean) => (
-              <AlertTriangle
-                size={22}
-                className={isActive ? "text-white" : "text-sky-400"}
-              />
-            ),
-            path: "/app/flood-damages-manager/list",
-          },
-        ]
-      : []),
+    // Hiển thị menu thiệt hại cho người dân, admin, và manager
+    // ...(profileData?.role.roleCode === Role.ADMIN ||
+    // profileData?.role.roleCode === Role.MANAGER
+    //   ? [
+    //       {
+    //         key: "flood-damages",
+    //         label: "Quản lý thiệt hại",
+    //         icon: (isActive: boolean) => (
+    //           <AlertTriangle
+    //             size={22}
+    //             className={isActive ? "text-white" : "text-sky-400"}
+    //           />
+    //         ),
+    //         path: "/app/flood-damages-manager/list",
+    //       },
+    //     ]
+    //   : []),
     ...(profileData?.role.roleCode === Role.ADMIN ||
     profileData?.role.roleCode === Role.MANAGER
       ? [
@@ -133,26 +139,70 @@ export default function Menu({
             ),
             path: "/app/human-resources-manager/list",
           },
+
+          // ...(profileData?.role.roleCode === Role.ADMIN ||
+          // profileData?.role.roleCode === Role.MANAGER ||
+          // profileData?.role.roleCode === Role.STAFF
+          //   ? [
+          //       {
+          //         key: "residents",
+          //         label: "QL dân cư và y tế",
+          //         icon: (isActive: boolean) => (
+          //           <ScheduleIcon height={22} width={22} isActive={isActive} />
+          //         ),
+          //         path: "/app/residents-manager/list",
+          //       },
+          //     ]
+          //   : []),
+          {
+            key: "notifications-manager",
+            label: "Quản lý thông báo",
+            icon: (isActive: boolean) => (
+              <BellIcon
+                size={22}
+                className={isActive ? "text-white" : "text-sky-400"}
+              />
+            ),
+            path: "/app/notifications-manager",
+          },
+          {
+            key: "reputation-manager",
+            label: "Quản lý điểm uy tín",
+            icon: (isActive: boolean) => (
+              <AwardIcon
+                size={22}
+                className={isActive ? "text-white" : "text-sky-400"}
+              />
+            ),
+            path: "/app/reputation-manager",
+          },
         ]
       : []),
     ...(profileData?.role.roleCode === Role.ADMIN ||
     profileData?.role.roleCode === Role.MANAGER
       ? [
           {
-            key: "residents",
-            label: "QL dân cư và y tế",
+            key: "statistics",
+            label: "Thống kê sự cố",
             icon: (isActive: boolean) => (
-              <ScheduleIcon height={22} width={22} isActive={isActive} />
+              <TrendingUp
+                size={22}
+                className={isActive ? "text-white" : "text-sky-400"}
+              />
             ),
-            path: "/app/residents-manager/list",
+            path: "/app/statistics",
           },
         ]
       : []),
-    ...(profileData?.role.roleCode === Role.ADMIN
+    ...(profileData?.role.roleCode === Role.ADMIN ||
+    profileData?.role.roleCode === Role.MANAGER
       ? [
           {
             key: "account",
-            label: "QL tài khoản",
+            label:
+              profileData.role.roleCode === Role.MANAGER
+                ? "Tài khoản người dân"
+                : "QL tài khoản",
             icon: (isActive: boolean) => (
               <UserIcon
                 height={22}
@@ -190,28 +240,34 @@ export default function Menu({
       {isOpen && (
         <div
           onClick={onClose}
-          className="fixed inset-0 bg-black/50 z-100 xl:hidden transition-opacity duration-300"
+          className="fixed inset-0 bg-black/50 z-2000 xl:hidden transition-opacity duration-300"
         />
       )}
       <menu
-        className={`fixed xl:top-0 top-[64px] left-0 flex h-screen flex-col bg-[linear-gradient(180deg,#0e2d4d_0%,#113c6b_100%)] text-white shadow-2xl shadow-[#0c1f36]/40 z-100 transition-all duration-300 ease-in-out ${
+        className={`fixed xl:top-0 top-[64px] left-0 flex h-[calc(100dvh-64px)] xl:h-screen overflow-y-auto scrollbar-hide flex-col bg-[linear-gradient(180deg,#0e2d4d_0%,#113c6b_100%)] text-white shadow-2xl shadow-[#0c1f36]/40 z-2000 transition-all duration-300 ease-in-out ${
           collapsed ? "w-[72px]" : "w-[230px] md:w-[240px]"
         } ${isOpen ? "translate-x-0" : "-translate-x-full"} xl:translate-x-0`}
       >
         <div
-          className={`flex items-center justify-center p-4 ${collapsed ? "h-16" : ""}`}
+          className={`flex items-center justify-center p-4 transition-all duration-300 ${
+            collapsed ? "h-16" : ""
+          }`}
         >
-          <div className="flex justify-center items-center overflow-hidden">
+          <div
+            className={`flex items-center justify-center rounded-full overflow-hidden transition-all duration-300 ${
+              collapsed
+                ? "w-0 h-0 opacity-0"
+                : "w-24 h-24 xl:w-28 xl:h-28 opacity-100"
+            }`}
+          >
             <img
               src="/image-logo.png"
               alt="logo"
-              className={`h-auto object-contain mix-blend-screen shrink-0 transition-all duration-300 ${
-                collapsed ? "w-0 opacity-0" : "w-28 xl:w-36 opacity-100"
-              }`}
+              className="w-[110%] h-[110%] max-w-[110%] object-cover shrink-0 transition-transform duration-300 hover:scale-105"
             />
           </div>
         </div>
-        <nav className="flex-1 space-y-2 px-3 py-4">
+        <nav className="flex-1 py-4 px-3">
           {menuItems.map((item) => {
             const isActive = activeKey === item.key;
             const button = (
@@ -271,17 +327,6 @@ export default function Menu({
             </Tooltip>
           </div>
         </nav>
-        <div
-          className={`hidden xl:block px-4 pb-6 pt-2 transition-all duration-300 ${collapsed ? "opacity-0 overflow-hidden h-0 p-0" : "opacity-100"}`}
-        >
-          <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-white/80">
-            <div className="font-semibold text-white">Trung tâm cảnh báo</div>
-            <p className="mt-1 leading-relaxed">
-              Theo dõi thời gian thực tình hình mưa, mực nước và các cảnh báo
-              ngập úng trên toàn hệ thống.
-            </p>
-          </div>
-        </div>
       </menu>
     </>
   );

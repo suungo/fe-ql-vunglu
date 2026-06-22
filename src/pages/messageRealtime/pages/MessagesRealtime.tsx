@@ -54,8 +54,17 @@ export default function MessagesRealtime() {
   }, []);
 
   const roleCode = currentUser?.role?.roleCode;
-  const isResponder = roleCode === "STAFF" || roleCode === "OFFICER";
-  const initialHelpType = roleCode === "STAFF" ? "medical" : roleCode === "OFFICER" ? "rescue" : null;
+  const isResponder =
+    roleCode === "STAFF" ||
+    roleCode === "OFFICER" ||
+    roleCode === "MANAGER" ||
+    roleCode === "ADMIN";
+  const initialHelpType =
+    roleCode === "STAFF"
+      ? "medical"
+      : roleCode === "OFFICER" || roleCode === "MANAGER" || roleCode === "ADMIN"
+      ? "rescue"
+      : null;
 
   const sessionId = useMemo(() => {
     if (isResponder) return null;
@@ -204,9 +213,11 @@ export default function MessagesRealtime() {
       sender: senderType,
       title: senderTitle,
       text: value || "📷 Đã gửi ảnh",
-      time: new Date().toLocaleTimeString("en-US", {
-        hour: "numeric",
+      time: new Date().toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
         minute: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Ho_Chi_Minh",
       }),
       attachments: pendingAttachments.length > 0 ? pendingAttachments : undefined,
     };
@@ -387,7 +398,7 @@ export default function MessagesRealtime() {
                         {session.messages.length > 0 ? session.messages[session.messages.length - 1].text : "Chưa có tin nhắn"}
                       </div>
                       <div className="text-[10px] text-white/40 mt-1">
-                        {new Date(session.lastUpdate).toLocaleTimeString()}
+                        {new Date(session.lastUpdate).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Ho_Chi_Minh" })}
                       </div>
                     </div>
                   ))
@@ -638,18 +649,25 @@ export default function MessagesRealtime() {
                         
                         let senderType: "user" | "doctor" | "officer" = "user";
                         let senderTitle = "Bạn";
-                        if (roleCode === "STAFF") senderType = "doctor", senderTitle = currentUser?.fullName || "NV Y tế";
-                        else if (roleCode === "OFFICER" || roleCode === "MANAGER") senderType = "officer", senderTitle = currentUser?.fullName || "Cán bộ";
+                         if (roleCode === "STAFF") {
+                           senderType = "doctor";
+                           senderTitle = currentUser?.fullName || "NV Y tế";
+                         } else if (roleCode === "OFFICER" || roleCode === "MANAGER") {
+                           senderType = "officer";
+                           senderTitle = currentUser?.fullName || "Cán bộ";
+                         }
 
                         const locMessage: ChatMessage = {
                           id: `loc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                           sender: senderType,
                           title: senderTitle,
                           text: `📍 Vị trí hiện tại: ${url}`,
-                          time: new Date().toLocaleTimeString("en-US", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          }),
+                          time: new Date().toLocaleTimeString("vi-VN", {
+                             hour: "2-digit",
+                             minute: "2-digit",
+                             hour12: false,
+                             timeZone: "Asia/Ho_Chi_Minh",
+                           }),
                         };
 
                         const targetSessionId = isResponder ? activeSessionId : sessionId;

@@ -116,55 +116,25 @@ export const DispatchItemCard: React.FC<DispatchItemCardProps> = ({
   };
 
   const getTypeTag = (type: DispatchReportType) => {
-    if (type === DispatchReportType.MANAGER_TO_INSPECTOR)
-      return <Tag color="purple">QL → Hậu kiểm</Tag>;
-    return <Tag color="blue">Hậu kiểm → Tuần tra</Tag>;
+    return <Tag color="blue">Yêu cầu tuần tra</Tag>;
   };
 
   return (
     <div
-      className={`w-full bg-white p-4 rounded-xl border transition-all cursor-pointer group flex items-center gap-4 ${
+      className={`w-full justify-around bg-white p-4 rounded-xl border transition-all cursor-pointer group flex items-center gap-4 ${
         isExpiredVisual
           ? "border-red-200 bg-red-50/50"
           : "border-slate-200 hover:border-purple-300 hover:shadow-md"
       }`}
       onClick={onClick}
     >
-      {/* Icon */}
-      <div
-        className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-          item.type === DispatchReportType.MANAGER_TO_INSPECTOR
-            ? "bg-purple-100"
-            : "bg-blue-100"
-        }`}
-      >
-        <ArrowRightLeft
-          size={22}
-          className={
-            item.type === DispatchReportType.MANAGER_TO_INSPECTOR
-              ? "text-purple-500"
-              : "text-blue-500"
-          }
-        />
+      <div className="xl:text-[16px] text-[14px] font-mono text-purple-600 font-bold mb-1">
+        {item.code}
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
-        <div className="md:col-span-4">
-          <div className="font-semibold text-slate-800 line-clamp-1">
-            {item.title || item.reflection?.title || "Điều chuyển"}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-            <User size={12} />
-            <span>{item.assigner?.fullName || "—"}</span>
-            <span>→</span>
-            <span className="font-semibold text-slate-700">
-              {item.assignee?.fullName || "—"}
-            </span>
-          </div>
-        </div>
-
-        <div className="md:col-span-4 flex items-center gap-2 flex-wrap">
+        <div className="md:col-span-4 flex items-center gap-2 flex-col">
           {getStatusTag(item.status)}
           {getTypeTag(item.type)}
           {countdown && (
@@ -186,12 +156,25 @@ export const DispatchItemCard: React.FC<DispatchItemCardProps> = ({
             </Tag>
           )}
         </div>
-
-        <div className="md:col-span-4 flex items-center justify-between">
+        <div className="md:col-span-4">
+          <div className="font-semibold text-slate-800 line-clamp-1">
+            {item.title || item.reflection?.title || "Yêu cầu tuần tra"}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+            <User size={12} />
+            <span>{item.assigner?.fullName || "—"}</span>
+            <span>→</span>
+            <span className="font-semibold text-slate-700">
+              {item.assignee?.fullName || item.customHandler || "—"}
+            </span>
+          </div>
+        </div>
+        <div className="md:col-span-4 flex items-center justify-end">
           <span className="text-xs text-slate-500">
-            {dayjs(item.createdAt).format("DD/MM/YYYY HH:mm")}
+            {dayjs(item.assignedAt || item.createdAt).format(
+              "DD/MM/YYYY HH:mm",
+            )}
           </span>
-          <span className="text-xs text-slate-400 italic">{item.code}</span>
         </div>
       </div>
 

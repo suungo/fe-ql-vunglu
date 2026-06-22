@@ -16,6 +16,10 @@ export default function FormAccount() {
   const [form] = Form.useForm();
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const isManager = currentUser?.role?.roleCode === "MANAGER";
+
   const handleRegister: FormProps<AccountRequest>["onFinish"] = async (
     values,
   ) => {
@@ -26,17 +30,18 @@ export default function FormAccount() {
         phoneNumber: values.phoneNumber,
         email: values.email,
         password: values.password,
+        roleCode: isManager ? "RESIDENT" : "MANAGER",
       };
       const response = await registerApi(data);
       if (response.statusCode === 201) {
         notification.success({
-          message: "Thành công",
+          title: "Thành công",
           description: response.message,
         });
         navigate("/app/account-manager/list");
       } else {
         notification.error({
-          message: "Thất bại",
+          title: "Thất bại",
           description: response.message,
         });
       }
@@ -48,7 +53,10 @@ export default function FormAccount() {
             message?: string;
           }
         ).response?.data?.message || (error as { message?: string }).message;
-      message.error(Array.isArray(errorMsg) ? errorMsg[0] : errorMsg);
+      notification.error({
+        title: "Thất bại",
+        description: Array.isArray(errorMsg) ? errorMsg[0] : errorMsg,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -58,7 +66,7 @@ export default function FormAccount() {
       <main className=" w-full">
         <div className=" bg-white p-6 rounded-lg shadow-sm">
           <h3 className="2xl:text-[22px] xl:text-[20px] text-[18px] mb-2 font-semibold text-[#000000]">
-            Thêm tài khoản quản lý
+            {isManager ? "Thêm tài khoản người dân" : "Thêm tài khoản quản lý"}
           </h3>
           <Form
             layout="vertical"
@@ -181,16 +189,20 @@ export default function FormAccount() {
                 label={
                   <p className="lg:text-[16px] md:text-[15px] text-[14px] text-[#464646] font-medium">
                     Email
-                    <span className="text-[#D32F2F] ml-[4px]">*</span>
+                    {!isManager && <span className="text-[#D32F2F] ml-[4px]">*</span>}
                   </p>
                 }
                 rules={[
                   {
-                    required: true,
+                    required: !isManager,
                     validator: (_, value) =>
                       new Promise((resolve, reject) => {
                         if (!value) {
-                          reject(new Error("Vui lòng nhập email"));
+                          if (isManager) {
+                            resolve("");
+                          } else {
+                            reject(new Error("Vui lòng nhập email"));
+                          }
                         } else {
                           const DoudleDoRegex = /\.{2,}/;
                           if (
@@ -219,127 +231,129 @@ export default function FormAccount() {
                   allowClear
                 />
               </Form.Item>
-              <div className="grid lg:grid-cols-2 gap-4 grid-cols-1">
-                <Form.Item<AccountRequest>
-                  required={false}
-                  name="password"
-                  label={
-                    <p className="lg:text-[16px] md:text-[15px] text-[14px] text-[#464646] font-medium">
-                      Mật khẩu
-                      <span className="text-[#D32F2F] ml-[4px]">*</span>
-                    </p>
-                  }
-                  rules={[
-                    {
-                      required: true,
-                      validator: (_, value) => {
-                        return new Promise((resolve, reject) => {
-                          if (!value) {
-                            return reject(new Error("Vui lòng nhập mật khẩu"));
-                          } else {
-                            const passwordRegex =
-                              /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
-                            if (
-                              !passwordRegex.test(value) ||
-                              value.length < 8
-                            ) {
-                              return reject(
-                                new Error(
-                                  "Mật khẩu tối thiểu 8 ký tự bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt",
-                                ),
-                              );
+              {!isManager && (
+                <div className="grid lg:grid-cols-2 gap-4 grid-cols-1">
+                  <Form.Item<AccountRequest>
+                    required={false}
+                    name="password"
+                    label={
+                      <p className="lg:text-[16px] md:text-[15px] text-[14px] text-[#464646] font-medium">
+                        Mật khẩu
+                        <span className="text-[#D32F2F] ml-[4px]">*</span>
+                      </p>
+                    }
+                    rules={[
+                      {
+                        required: true,
+                        validator: (_, value) => {
+                          return new Promise((resolve, reject) => {
+                            if (!value) {
+                              return reject(new Error("Vui lòng nhập mật khẩu"));
                             } else {
-                              return resolve("");
+                              const passwordRegex =
+                                /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+                              if (
+                                !passwordRegex.test(value) ||
+                                value.length < 8
+                              ) {
+                                return reject(
+                                  new Error(
+                                    "Mật khẩu tối thiểu 8 ký tự bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt",
+                                  ),
+                                );
+                              } else {
+                                return resolve("");
+                              }
                             }
-                          }
-                        });
+                          });
+                        },
                       },
-                    },
-                  ]}
-                  validateTrigger={["onBlur", "onChange"]}
-                >
-                  <Input.Password
-                    placeholder="Nhập mật khẩu"
-                    autoComplete="password"
-                    className="h-10! bg-[#F5F5F5] rounded-[10px]"
-                    iconRender={(version) =>
-                      version ? (
-                        <Eye
-                          size={24}
-                          style={{
-                            color: "#989898",
-                            cursor: "pointer",
-                          }}
-                        />
-                      ) : (
-                        <EyeOff
-                          size={24}
-                          style={{
-                            color: "#989898",
-                            cursor: "pointer",
-                          }}
-                        />
-                      )
+                    ]}
+                    validateTrigger={["onBlur", "onChange"]}
+                  >
+                    <Input.Password
+                      placeholder="Nhập mật khẩu"
+                      autoComplete="password"
+                      className="h-10! bg-[#F5F5F5] rounded-[10px]"
+                      iconRender={(version) =>
+                        version ? (
+                          <Eye
+                            size={24}
+                            style={{
+                              color: "#989898",
+                              cursor: "pointer",
+                            }}
+                          />
+                        ) : (
+                          <EyeOff
+                            size={24}
+                            style={{
+                              color: "#989898",
+                              cursor: "pointer",
+                            }}
+                          />
+                        )
+                      }
+                      allowClear
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    required={false}
+                    name={"rePassword"}
+                    label={
+                      <p className="lg:text-[16px] md:text-[15px] text-[14px] text-[#464646] font-medium">
+                        Nhập lại mật khẩu
+                        <span className="text-[#D32F2F] ml-[4px]">*</span>
+                      </p>
                     }
-                    allowClear
-                  />
-                </Form.Item>
-                <Form.Item
-                  required={false}
-                  name={"rePassword"}
-                  label={
-                    <p className="lg:text-[16px] md:text-[15px] text-[14px] text-[#464646] font-medium">
-                      Nhập lại mật khẩu
-                      <span className="text-[#D32F2F] ml-[4px]">*</span>
-                    </p>
-                  }
-                  dependencies={["password"]}
-                  rules={[
-                    {
-                      required: true,
-                      message: "Vui lòng nhập lại mật khẩu mới",
-                    },
-                    ({ getFieldValue }) => ({
-                      validator(_, value) {
-                        return new Promise((resolve, reject) => {
-                          if (!value || getFieldValue("password") === value) {
-                            resolve("");
-                          } else {
-                            reject(new Error("Mật khẩu không khớp"));
-                          }
-                        });
+                    dependencies={["password"]}
+                    rules={[
+                      {
+                        required: true,
+                        message: "Vui lòng nhập lại mật khẩu mới",
                       },
-                    }),
-                  ]}
-                  validateTrigger={["onBlur", "onChange"]}
-                >
-                  <Input.Password
-                    placeholder="Xác nhận lại mật khẩu"
-                    autoComplete="rePassword"
-                    className="h-10! bg-[#F5F5F5] rounded-[10px]"
-                    iconRender={(version) =>
-                      version ? (
-                        <Eye
-                          size={24}
-                          style={{
-                            color: "#989898",
-                            cursor: "pointer",
-                          }}
-                        />
-                      ) : (
-                        <EyeOff
-                          size={24}
-                          style={{
-                            color: "#989898",
-                            cursor: "pointer",
-                          }}
-                        />
-                      )
-                    }
-                    allowClear
-                  />
-                </Form.Item>
-              </div>
+                      ({ getFieldValue }) => ({
+                        validator(_, value) {
+                          return new Promise((resolve, reject) => {
+                            if (!value || getFieldValue("password") === value) {
+                              resolve("");
+                            } else {
+                              reject(new Error("Mật khẩu không khớp"));
+                            }
+                          });
+                        },
+                      }),
+                    ]}
+                    validateTrigger={["onBlur", "onChange"]}
+                  >
+                    <Input.Password
+                      placeholder="Xác nhận lại mật khẩu"
+                      autoComplete="rePassword"
+                      className="h-10! bg-[#F5F5F5] rounded-[10px]"
+                      iconRender={(version) =>
+                        version ? (
+                          <Eye
+                            size={24}
+                            style={{
+                              color: "#989898",
+                              cursor: "pointer",
+                            }}
+                          />
+                        ) : (
+                          <EyeOff
+                            size={24}
+                            style={{
+                              color: "#989898",
+                              cursor: "pointer",
+                            }}
+                          />
+                        )
+                      }
+                      allowClear
+                    />
+                  </Form.Item>
+                </div>
+              )}
             </div>
 
             <Form.Item>

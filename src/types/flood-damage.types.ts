@@ -28,6 +28,8 @@ export interface FloodDamage {
   createdBy: number;
   createdAt: string;
   updatedAt: string;
+  reviewedBy?: number;
+  reviewedAt?: string;
   reflection?: {
     id: number;
     title: string;

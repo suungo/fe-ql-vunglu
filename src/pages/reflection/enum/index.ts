@@ -27,7 +27,7 @@ export enum Category {
 
 
 export enum ReflectionStatus {
-  PENDING = 'PENDING',       // Chờ xác minh (mới gửi từ cư dân)
+  PENDING = 'PENDING',       // Chờ xác minh (mới gửi từ người dân)
   VERIFIED = 'VERIFIED',     // Cán bộ tăng cường đã xác minh
   ASSIGNED = 'ASSIGNED',     // Quản lý đã phân công cho Hậu kiểm
   IN_PROGRESS = 'IN_PROGRESS', // Tuần tra đang xử lý hiện trường

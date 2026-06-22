@@ -1,4 +1,5 @@
 import { Gender, Role } from "@/enums";
+import "../../floodDamages/styles/floodDamages.css";
 import useDebounce from "@/hooks/useDebounce"; // giả sử hook này return [debouncedValue]
 import useStyle from "@/interfaces/useStyle";
 import { exportToExcel, exportToWord } from "@/utils/exportUtils";
@@ -159,7 +160,7 @@ export default function HumanResourcesPage() {
           ? "Cán bộ tăng cường"
           : item.position === HumanResourcesPosition.STAFF
             ? "Nhân viên y tế"
-            : "Cư dân",
+            : "Người dân",
       status:
         item.status === HumanResourcesStatus.ACTIVE
           ? "Đang làm việc"
@@ -299,13 +300,13 @@ export default function HumanResourcesPage() {
               ? "Cán bộ tăng cường"
               : text === HumanResourcesPosition.STAFF
                 ? "Nhân viên y tế"
-                : text === HumanResourcesPosition.POSTOFFICER
-                  ? "Cán bộ hậu kiểm"
-                  : text === HumanResourcesPosition.ELECTRICITYSTAFF
-                    ? "Nhân viên điện lực"
-                    : text === HumanResourcesPosition.PATROL
-                      ? "Cán bộ tuần tra"
-                      : text || "Chưa có dữ liệu"}
+                : // : text === HumanResourcesPosition.POSTOFFICER
+                  //   ? "Cán bộ hậu kiểm"
+                  text === HumanResourcesPosition.ELECTRICITYSTAFF
+                  ? "Nhân viên điện lực"
+                  : text === HumanResourcesPosition.PATROL
+                    ? "Cán bộ tuần tra"
+                    : text || "Chưa có dữ liệu"}
           </span>
         ),
       },
@@ -355,37 +356,41 @@ export default function HumanResourcesPage() {
               <Dropdown
                 menu={{
                   items: [
-                    {
-                      key: "edit",
-                      label: (
-                        <span
-                          className="text-blue-500 text-[16px] cursor-pointer flex items-center gap-2"
-                          onClick={() => {
-                            setIsOpenModalAdd(true);
-                            setId(Number(record?.id));
-                            setStatus("edit");
-                          }}
-                        >
-                          {" "}
-                          <Pencil size={16} /> Chỉnh sửa
-                        </span>
-                      ),
-                    },
-                    {
-                      key: "delete",
-                      label: (
-                        <span
-                          className="text-red-500 text-[16px] cursor-pointer flex items-center gap-2"
-                          onClick={() => {
-                            setIsOpenModalDelete(true);
-                            setId(Number(record?.id));
-                          }}
-                        >
-                          {" "}
-                          <Trash size={16} /> Xóa
-                        </span>
-                      ),
-                    },
+                    ...(user?.role?.roleCode === Role.ADMIN
+                      ? []
+                      : [
+                          {
+                            key: "edit",
+                            label: (
+                              <span
+                                className="text-blue-500 text-[16px] cursor-pointer flex items-center gap-2"
+                                onClick={() => {
+                                  setIsOpenModalAdd(true);
+                                  setId(Number(record?.id));
+                                  setStatus("edit");
+                                }}
+                              >
+                                {" "}
+                                <Pencil size={16} /> Chỉnh sửa
+                              </span>
+                            ),
+                          },
+                          {
+                            key: "delete",
+                            label: (
+                              <span
+                                className="text-red-500 text-[16px] cursor-pointer flex items-center gap-2"
+                                onClick={() => {
+                                  setIsOpenModalDelete(true);
+                                  setId(Number(record?.id));
+                                }}
+                              >
+                                {" "}
+                                <Trash size={16} /> Xóa
+                              </span>
+                            ),
+                          },
+                        ]),
                     {
                       key: "detail",
                       label: (
@@ -512,17 +517,18 @@ export default function HumanResourcesPage() {
               Danh sách nhân sự
             </div>
             <div className="flex gap-2">
-              {(user?.role?.roleCode === Role.MANAGER || user?.role?.roleCode === Role.ADMIN) && (
+              {(user?.role?.roleCode === Role.MANAGER ||
+                user?.role?.roleCode === Role.ADMIN) && (
                 <>
                   <Button
                     onClick={handleExportExcelHR}
-                    className="text-[16px] font-medium h-9! border-green-600 text-green-600 hover:bg-green-50"
+                    className="fd-btn-outline-green"
                   >
                     <FileSpreadsheet size={16} /> Xuất Excel
                   </Button>
                   <Button
                     onClick={handleExportWordHR}
-                    className="text-[16px] font-medium h-9! border-blue-600 text-blue-600 hover:bg-blue-50"
+                    className="fd-btn-outline-blue"
                   >
                     <FileText size={16} /> Xuất Word
                   </Button>
@@ -541,11 +547,11 @@ export default function HumanResourcesPage() {
             </div>
           </div>
 
-          <div className="flex justify-between mb-4">
-            <div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-between mb-4">
+            <div className="w-full sm:w-auto">
               <Select
                 placeholder="Chọn trạng thái"
-                className="h-8! w-[200px]"
+                className="h-8! w-full sm:w-[200px]"
                 allowClear
                 value={filterStatus}
                 onChange={(value) => {
@@ -569,10 +575,10 @@ export default function HumanResourcesPage() {
               />
             </div>
 
-            <div>
+            <div className="w-full sm:w-auto">
               <Input
                 prefix={<Search size={14} />}
-                className="h-8! w-[300px]!"
+                className="h-8! w-full sm:w-[300px]!"
                 allowClear
                 value={keyword}
                 placeholder="Tìm kiếm theo mã, tên, email..."

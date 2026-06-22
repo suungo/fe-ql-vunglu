@@ -26,7 +26,21 @@ export interface Resident {
 
   floodDamages?: IFloodDamage[]; // Danh sách thiệt hại
 
+  reflections?: any[]; // Danh sách phản ánh
+  userId?: number;
+  user?: {
+    id: number;
+    fullName: string;
+    phoneNumber: string;
+    email?: string;
+    role?: {
+      roleCode: string;
+      roleName: string;
+    };
+  };
+
   createdAt: Date; // Ngày tạo
+  cccd?: string; // Số CCCD
 }
 
 export interface CreateResident {
@@ -51,6 +65,9 @@ export interface CreateResident {
 
   hasBusiness: boolean; // Có kinh doanh
 
+  userId?: number;
+  createAccount?: boolean;
+  cccd?: string; // Số CCCD
 }
 
 export type UpdateResident = CreateResident;

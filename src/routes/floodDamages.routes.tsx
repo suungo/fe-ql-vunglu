@@ -38,6 +38,14 @@ export const floodDamagesRoutes: RouteObject[] = [
         ),
       },
       {
+        path: "create",
+        element: (
+          <LazyLoad>
+            <EditFloodDamages />
+          </LazyLoad>
+        ),
+      },
+      {
         path: "edit/:id",
         element: (
           <LazyLoad>

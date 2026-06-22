@@ -32,3 +32,16 @@ export interface ChangePasswordRequest {
   oldPassword: string; // Mật khẩu cũ
   newPassword: string; // Mật khẩu mới
 }
+
+export interface UserDevice {
+  id: number;
+  deviceId: string;
+  userId: number;
+  deviceName?: string;
+  deviceType?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  isActive: boolean;
+  lastActiveAt?: string;
+  createdAt?: string;
+}

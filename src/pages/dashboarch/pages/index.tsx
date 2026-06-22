@@ -1,518 +1,745 @@
-import { Modal, Tag, Typography } from "antd";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import { Car, Check, Clock, CloudRain, Info, Waves } from "lucide-react";
-import React, { useEffect, useRef, useState } from "react";
 import {
-  CircleMarker,
-  LayersControl,
-  MapContainer,
-  Popup,
-  TileLayer,
-  WMSTileLayer,
-  useMapEvents,
-} from "react-leaflet";
-
-const { Title } = Typography;
-
-const defaultIcon = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-});
-L.Marker.prototype.options.icon = defaultIcon;
-
-const mapCenter: [number, number] = [10.865, 106.731];
-
-const GEOSERVER_URL = `${import.meta.env.VITE_API_URL_GEOSERVER}/geoserver/tambinh/wms`;
-const GEOSERVER_LAYER = "tambinh:tam-binh_map";
-const GEOSERVER_QUERY_LAYER = "tambinh:ranhphuongTamBinh";
-
-// ========== WMS GetFeatureInfo khi click ==========
-
-/** Parse GeoServer text/plain response:
- *  "key = value\n" → { key: value }
- */
-interface GeoServerProperties {
-  [key: string]: string;
-}
-
-function parseGeoServerText(text: string): GeoServerProperties {
-  const result: GeoServerProperties = {};
-  text.split("\n").forEach((line) => {
-    const sep = line.indexOf("=");
-    if (sep > 0) {
-      const key = line.slice(0, sep).trim();
-      const val = line.slice(sep + 1).trim();
-      if (key && val) result[key] = val;
-    }
-  });
-  return result;
-}
-
-function WmsClickHandler({
-  wmsUrl,
-  displayLayer,
-  queryLayer,
-}: {
-  wmsUrl: string;
-  displayLayer: string;
-  queryLayer: string;
-}) {
-  const popupRef = useRef<ReturnType<typeof L.popup> | null>(null);
-
-  const map = useMapEvents({
-    click: async (e: { latlng: { lat: number; lng: number } }) => {
-      const size = map.getSize();
-      const bounds = map.getBounds();
-      const point = map.latLngToContainerPoint(e.latlng);
-
-      const bbox = [
-        bounds.getWest(),
-        bounds.getSouth(),
-        bounds.getEast(),
-        bounds.getNorth(),
-      ].join(",");
-
-      // Ưu tiên dùng application/json để tránh lỗi mã hóa tiếng Việt
-      const params = new URLSearchParams({
-        service: "WMS",
-        version: "1.1.0",
-        request: "GetFeatureInfo",
-        layers: displayLayer,
-        query_layers: queryLayer,
-        info_format: "application/json", // Dùng JSON chuẩn hơn text/plain
-        feature_count: "1",
-        x: String(Math.round(point.x)),
-        y: String(Math.round(point.y)),
-        bbox,
-        width: String(size.x),
-        height: String(size.y),
-        srs: "EPSG:4326",
-      });
-
-      if (popupRef.current) popupRef.current.remove();
-      const loadingPopup = L.popup({ closeButton: false })
-        .setLatLng(e.latlng)
-        .setContent(
-          `<div style="font-family:'Inter', sans-serif;font-size:13px;color:#6b7280;">⏳ Đang tải...</div>`,
-        )
-        .openOn(map);
-      popupRef.current = loadingPopup;
-
-      try {
-        const res = await fetch(`${wmsUrl}?${params.toString()}`);
-        const jsonData = await res.json();
-
-        if (popupRef.current) popupRef.current.remove();
-
-        if (jsonData?.features?.length > 0) {
-          const props = jsonData.features[0].properties;
-          const tenDvhc =
-            props?.ten_dvhc ??
-            props?.TEN_DVHC ??
-            props?.Ten_DVHC ??
-            props?.name ??
-            "Không rõ";
-
-          const popup = L.popup({ maxWidth: 300 })
-            .setLatLng(e.latlng)
-            .setContent(
-              `<div style="font-family:'Inter', sans-serif;padding:4px 2px;">
-                <div style="font-size:11px;color:#6b7280;margin-bottom:6px;
-                  letter-spacing:.5px;text-transform:uppercase;font-weight:500;">
-                  📍 Đơn vị hành chính
-                </div>
-                <div style="font-size:18px;font-weight:700;color:#1d4ed8;line-height:1.2;">
-                  ${tenDvhc}
-                </div>
-              </div>`,
-            )
-            .openOn(map);
-          popupRef.current = popup;
-        } else {
-          // Fallback sang text/plain nếu JSON không có data (hiếm gặp)
-          params.set("info_format", "text/plain");
-          const resText = await fetch(`${wmsUrl}?${params.toString()}`);
-          const buffer = await resText.arrayBuffer();
-          const text = new TextDecoder("utf-8").decode(buffer);
-
-          if (text.includes("ten_dvhc") || text.includes("TEN_DVHC")) {
-            const props = parseGeoServerText(text);
-            const tenDvhc =
-              props["ten_dvhc"] || props["TEN_DVHC"] || "Không rõ";
-            const popup = L.popup({ maxWidth: 300 })
-              .setLatLng(e.latlng)
-              .setContent(
-                `<div style="font-family:'Inter', sans-serif;padding:4px 2px;">
-                  <div style="font-size:11px;color:#6b7280;margin-bottom:6px;text-transform:uppercase;">📍 Đơn vị hành chính</div>
-                  <div style="font-size:18px;font-weight:700;color:#1d4ed8;">${tenDvhc}</div>
-                </div>`,
-              )
-              .openOn(map);
-            popupRef.current = popup;
-          } else {
-            const popup = L.popup({ maxWidth: 240 })
-              .setLatLng(e.latlng)
-              .setContent(
-                `<div style="font-family:'Inter', sans-serif;font-size:13px;color:#9ca3af;">ℹ️ Không có dữ liệu tại vị trí này.</div>`,
-              )
-              .openOn(map);
-            popupRef.current = popup;
-          }
-        }
-      } catch (err: unknown) {
-        console.error("[GeoServer] Lỗi:", err);
-        if (popupRef.current) popupRef.current.remove();
-      }
-    },
-  });
-
-  return null;
-}
-
-import NewsFeed from "../components/NewsFeed";
-import OtherInfo from "../components/OtherInfo";
-import RainInfo from "../components/RainInfo";
-import TideInfo from "../components/TideInfo";
-import TrafficInfo from "../components/Tranficlnfo";
-
+  Card,
+  Spin,
+  Statistic,
+  Empty,
+  DatePicker,
+  Typography,
+  Tag,
+  Button,
+} from "antd";
+import {
+  CloudRain,
+  TrendingUp,
+  Droplets,
+  Wind,
+  Eye,
+  RefreshCw,
+  AlertTriangle,
+  Sun,
+  Cloud,
+} from "lucide-react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
+import { BASE_URL } from "@/apis";
+import dayjs from "dayjs";
 import { ReflectionStatus } from "../../reflection/enum";
 import type { Reflection } from "../../reflection/interfaces";
 
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case "LOW":
-      return "#22c55e"; // Xanh lá
-    case "MEDIUM":
-      return "#eab308"; // Vàng
-    case "HIGH":
-      return "#ef4444"; // Đỏ
-    default:
-      return "#10b981";
-  }
-};
+const { Title, Text } = Typography;
+const { RangePicker } = DatePicker;
+
+// Tọa độ phường Tam Bình, TP Thủ Đức
+const LAT = 10.865;
+const LON = 106.731;
+const OWM_API_KEY = "bd5e378503939ddaee76f12ad7a97608";
+
+interface WeatherData {
+  temp: number;
+  feelsLike: number;
+  humidity: number;
+  windSpeed: number;
+  visibility: number;
+  description: string;
+  rainLastHour: number; // mm
+  rain3h: number; // mm
+  condition: string;
+  rainProbability?: number;
+}
 
 export default function Dashboard() {
-  const [resolvedReflections, setResolvedReflections] = useState<Reflection[]>(
-    [],
-  );
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentInfo, setCurrentInfo] = useState<{
-    title: string;
-    content: React.ReactNode;
-  } | null>(null);
-  const [modalType, setModalType] = useState<
-    "rain" | "tide" | "traffic" | "other" | null
-  >(null);
+  const [allReflections, setAllReflections] = useState<Reflection[]>([]);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
+  const [dateRange, setDateRange] = useState<
+    [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
+  >([dayjs(), dayjs()]);
+
+  // Weather state
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [loadingWeather, setLoadingWeather] = useState(true);
+  const [weatherError, setWeatherError] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    // Lấy dữ liệu các sự kiện phục vụ bản đồ (isMap=true)
-    fetch(`http://localhost:3001/api/reports?isMap=true&limit=100`, {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // 1. Tải dữ liệu phản ánh sự cố cho thống kê
+  useEffect(() => {
+    setIsStatsLoading(true);
+    BASE_URL.get("/reports", {
+      params: { limit: 1000 },
       headers: {
         Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
       },
     })
-      .then((res) => res.json())
       .then((res) => {
-        if (res.statusCode === 200) {
-          setResolvedReflections(res.data);
-        }
+        setAllReflections(res.data?.data || res.data || []);
       })
-      .catch((err) => console.error("Lỗi khi tải sự kiện bản đồ:", err));
+      .catch((err) => console.error("Lỗi khi tải dữ liệu thống kê:", err))
+      .finally(() => setIsStatsLoading(false));
   }, []);
 
-  const handleOpenModal = (
-    type: "rain" | "tide" | "traffic" | "other",
-    title: string,
-    content: string,
-  ) => {
-    setModalType(type);
-    setCurrentInfo({ title, content });
-    setIsModalOpen(true);
+  // 2. Fetch dữ liệu thời tiết thời gian thực
+  const fetchWeather = useCallback(async () => {
+    setLoadingWeather(true);
+    setWeatherError(false);
+    try {
+      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${LAT}&lon=${LON}&appid=${OWM_API_KEY}&units=metric&lang=vi`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Weather fetch failed");
+      const data = await res.json();
+
+      // Fetch forecast for probability of precipitation (pop)
+      let rainProbability = 0;
+      try {
+        const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${LAT}&lon=${LON}&appid=${OWM_API_KEY}&units=metric&lang=vi`;
+        const forecastRes = await fetch(forecastUrl);
+        if (forecastRes.ok) {
+          const forecastData = await forecastRes.json();
+          // pop represents probability of precipitation from 0.0 to 1.0 (e.g. 0.85 -> 85%)
+          rainProbability = Math.round(
+            (forecastData.list?.[0]?.pop ?? 0) * 100,
+          );
+        }
+      } catch (err) {
+        console.error("Forecast fetch error:", err);
+      }
+
+      setWeather({
+        temp: Math.round(data.main?.temp ?? 30),
+        feelsLike: Math.round(data.main?.feels_like ?? 32),
+        humidity: data.main?.humidity ?? 80,
+        windSpeed: Math.round((data.wind?.speed ?? 2) * 3.6), // m/s -> km/h
+        visibility: Math.round((data.visibility ?? 10000) / 1000), // m -> km
+        description: data.weather?.[0]?.description ?? "không rõ",
+        rainLastHour: data.rain?.["1h"] ?? 0,
+        rain3h: data.rain?.["3h"] ?? 0,
+        condition: data.weather?.[0]?.main ?? "Clear",
+        rainProbability,
+      });
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error("Weather fetch error:", err);
+      setWeatherError(true);
+    } finally {
+      setLoadingWeather(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWeather();
+    // Làm mới mỗi 10 phút
+    const interval = setInterval(fetchWeather, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchWeather]);
+
+  // Lấy nhãn cường độ mưa
+  const getRainIntensityLabel = (mm: number) => {
+    if (mm === 0)
+      return {
+        label: "Không mưa",
+        color: "text-emerald-500",
+        bg: "bg-emerald-50 border-emerald-200",
+      };
+    if (mm < 2.5)
+      return {
+        label: "Mưa nhỏ",
+        color: "text-blue-500",
+        bg: "bg-blue-50 border-blue-200",
+      };
+    if (mm < 7.5)
+      return {
+        label: "Mưa vừa",
+        color: "text-indigo-500",
+        bg: "bg-indigo-50 border-indigo-200",
+      };
+    if (mm < 15)
+      return {
+        label: "Mưa to",
+        color: "text-amber-500",
+        bg: "bg-amber-50 border-amber-200",
+      };
+    return {
+      label: "Mưa rất to",
+      color: "text-rose-500",
+      bg: "bg-rose-50 border-rose-200",
+    };
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setCurrentInfo(null);
-    setModalType(null);
-  };
+  const weatherIcon = useMemo(() => {
+    if (!weather) return <Sun size={48} className="text-amber-500" />;
+    const cond = weather.condition.toLowerCase();
+    if (cond.includes("rain") || cond.includes("drizzle")) {
+      return <CloudRain size={48} className="text-blue-500 animate-bounce" />;
+    }
+    if (cond.includes("cloud")) {
+      return <Cloud size={48} className="text-slate-400" />;
+    }
+    return <Sun size={48} className="text-amber-500 animate-pulse" />;
+  }, [weather]);
 
-  const renderModalContent = () => {
-    if (modalType === "rain") return <RainInfo />;
-    if (modalType === "tide") return <TideInfo />;
-    if (modalType === "traffic") return <TrafficInfo />;
-    if (modalType === "other") return <OtherInfo />;
-    return (
-      <>
-        <p>{currentInfo?.content}</p>
-        <p className="text-slate-500 italic mt-4">
-          Nội dung chi tiết đang được cập nhật...
-        </p>
-      </>
-    );
-  };
+  const filteredStatsReflections = useMemo(() => {
+    if (!dateRange || !dateRange[0] || !dateRange[1]) {
+      return allReflections;
+    }
+    const start = dateRange[0].startOf("day");
+    const end = dateRange[1].endOf("day");
+
+    return allReflections.filter((r) => {
+      if (!r.createdAt) return false;
+      const createdTime = dayjs(r.createdAt);
+      // So sánh bao gồm (inclusive) cả ngày bắt đầu và ngày kết thúc
+      return !createdTime.isBefore(start) && !createdTime.isAfter(end);
+    });
+  }, [allReflections, dateRange]);
+
+  const stats = useMemo(() => {
+    const pending = filteredStatsReflections.filter(
+      (r) => r.status === ReflectionStatus.PENDING,
+    ).length;
+    const verified = filteredStatsReflections.filter(
+      (r) => r.status === ReflectionStatus.VERIFIED,
+    ).length;
+    const assigned = filteredStatsReflections.filter(
+      (r) => r.status === ReflectionStatus.ASSIGNED,
+    ).length;
+    const inProgress = filteredStatsReflections.filter(
+      (r) => r.status === ReflectionStatus.IN_PROGRESS,
+    ).length;
+    const completed = filteredStatsReflections.filter(
+      (r) => r.status === ReflectionStatus.COMPLETED,
+    ).length;
+    const resolved = filteredStatsReflections.filter(
+      (r) => r.status === ReflectionStatus.RESOLVED,
+    ).length;
+    const rejected = filteredStatsReflections.filter(
+      (r) => r.status === ReflectionStatus.REJECTED,
+    ).length;
+
+    return {
+      total: filteredStatsReflections.length,
+      pending,
+      verified,
+      assigned,
+      inProgress,
+      completed,
+      resolved,
+      rejected,
+    };
+  }, [filteredStatsReflections]);
+
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const roleCode = user?.role?.roleCode;
+  const isOfficer = roleCode === "OFFICER";
+  const isResident = roleCode === "RESIDENT";
+  const isPatrol = roleCode === "PATROL";
+  const isManager = roleCode === "MANAGER";
+  const isMedicalStaff = roleCode === "STAFF";
+  const isElectricityStaff =
+    user?.humanResource?.position === "ELECTRICITYSTAFF" ||
+    (roleCode === "PATROL" &&
+      stats &&
+      stats.assigned === undefined &&
+      stats.inProgress !== undefined);
+  const isMedicalOrElectricityStaff = isMedicalStaff || isElectricityStaff;
+
+  const totalReflections = useMemo(() => {
+    if (isResident) {
+      return stats.total || 0;
+    }
+    if (isOfficer) {
+      return stats.pending || 0;
+    }
+    if (isManager) {
+      return (
+        (stats.verified || 0) +
+        (stats.assigned || 0) +
+        (stats.inProgress || 0) +
+        (stats.completed || 0) +
+        (stats.resolved || 0) +
+        (stats.rejected || 0)
+      );
+    }
+    if (isPatrol) {
+      return (
+        (stats.assigned || 0) +
+        (stats.inProgress || 0) +
+        (stats.completed || 0) +
+        (stats.resolved || 0)
+      );
+    }
+    if (isMedicalOrElectricityStaff) {
+      return (stats.inProgress || 0) + (stats.resolved || 0);
+    }
+    return stats.total || 0;
+  }, [
+    stats,
+    isResident,
+    isOfficer,
+    isManager,
+    isPatrol,
+    isMedicalOrElectricityStaff,
+  ]);
+
+  const statsData = useMemo(() => {
+    if (isMedicalOrElectricityStaff) {
+      return [
+        { name: "Đang xử lý", count: stats.inProgress || 0, color: "#0ea5e9" },
+        { name: "Hoàn thành", count: stats.resolved || 0, color: "#10b981" },
+      ];
+    }
+
+    if (isOfficer) {
+      return [
+        { name: "Chờ xác minh", count: stats.pending || 0, color: "#f59e0b" },
+        { name: "Đã xác minh", count: stats.verified || 0, color: "#6366f1" },
+        { name: "Từ chối", count: stats.rejected || 0, color: "#ef4444" },
+      ];
+    }
+
+    if (isResident) {
+      return [
+        { name: "Chờ xác minh", count: stats.pending || 0, color: "#f59e0b" },
+        { name: "Đã xác minh", count: stats.verified || 0, color: "#6366f1" },
+        { name: "Đang xử lý", count: stats.inProgress || 0, color: "#0ea5e9" },
+        { name: "Hoàn thành", count: stats.resolved || 0, color: "#10b981" },
+        { name: "Từ chối", count: stats.rejected || 0, color: "#ef4444" },
+      ];
+    }
+
+    if (isPatrol) {
+      return [
+        { name: "Đã phân công", count: stats.assigned || 0, color: "#8b5cf6" },
+        { name: "Đang xử lý", count: stats.inProgress || 0, color: "#0ea5e9" },
+        { name: "Chờ xác nhận", count: stats.completed || 0, color: "#0891b2" },
+        { name: "Hoàn thành", count: stats.resolved || 0, color: "#10b981" },
+      ];
+    }
+
+    if (isManager) {
+      return [
+        { name: "Đã phân công", count: stats.assigned || 0, color: "#8b5cf6" },
+        { name: "Đang xử lý", count: stats.inProgress || 0, color: "#0ea5e9" },
+        { name: "Hoàn thành", count: stats.resolved || 0, color: "#10b981" },
+        { name: "Từ chối", count: stats.rejected || 0, color: "#ef4444" },
+      ];
+    }
+
+    return [
+      { name: "Chờ xác minh", count: stats.pending || 0, color: "#f59e0b" },
+      { name: "Đã xác minh", count: stats.verified || 0, color: "#6366f1" },
+      { name: "Đã phân công", count: stats.assigned || 0, color: "#8b5cf6" },
+      { name: "Đang xử lý", count: stats.inProgress || 0, color: "#0ea5e9" },
+      { name: "Chờ xác nhận", count: stats.completed || 0, color: "#0891b2" },
+      { name: "Hoàn thành", count: stats.resolved || 0, color: "#10b981" },
+      { name: "Từ chối", count: stats.rejected || 0, color: "#ef4444" },
+    ];
+  }, [
+    stats,
+    isOfficer,
+    isResident,
+    isPatrol,
+    isManager,
+    isMedicalOrElectricityStaff,
+  ]);
 
   return (
-    <div className="space-y-6 p-4">
+    <div
+      className={`space-y-6  bg-[#FFFFFF] rounded-lg shadow-sm ${isMobile ? "" : "p-4"}`}
+    >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-        <Title level={3} className="!m-0 text-slate-800 !text-lg md:!text-2xl">
-          Bản đồ cảnh báo sự cố đô thị
-        </Title>
-        <div className="flex gap-3 text-[10px] md:text-sm bg-white/50 p-2 rounded-lg border border-white">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500 block" /> Ưu
-            tiên thấp
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 block" />{" "}
-            Trung bình
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 block" /> Khẩn
-            cấp
+      {!isMobile ? (
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="m-0! text-slate-800 2xl:text-[22px] xl:text-[20px] text-[18px] font-bold">
+              Thông tin tổng hợp - Dashboard
+            </h1>
           </div>
         </div>
-      </div>
+      ) : (
+        <></>
+      )}
 
-      {/* Hướng dẫn */}
-      <div className="text-xs text-slate-500 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 flex items-center gap-2">
-  
-        <span>
-          Bản đồ hiển thị <strong>Các sự kiện đang xử lý và đã hoàn tất</strong>
-          . Màu sắc thể hiện mức độ ưu tiên của sự cố.
-        </span>
-      </div>
+      <div
+        className={
+          isMobile
+            ? "max-w-3xl mx-auto"
+            : "grid grid-cols-1 lg:grid-cols-3 gap-6"
+        }
+      >
+        {/* CỘT THỐNG KÊ (Chiếm 2/3) - Ẩn trên thiết bị di động */}
+        {!isMobile && (
+          <div className="lg:col-span-2 space-y-6">
+            <Card
+              title={
+                <div className="flex items-center gap-2 text-slate-800">
+                  <span>Thống kê tình hình xử lý sự cố đô thị</span>
+                </div>
+              }
+              extra={
+                <RangePicker
+                  format={"DD/MM/YYYY"}
+                  value={dateRange}
+                  onChange={(dates) => setDateRange(dates)}
+                  placeholder={["Từ ngày", "Đến ngày"]}
+                  style={{ width: 350 }}
+                  allowClear
+                />
+              }
+              className="shadow-sm rounded-2xl border border-slate-100 bg-white"
+            >
+              {isStatsLoading ? (
+                <div className="flex justify-center py-20">
+                  <Spin size="large" tip="Đang tải dữ liệu thống kê..." />
+                </div>
+              ) : totalReflections === 0 ? (
+                <Empty description="Không có dữ liệu thống kê trong khoảng thời gian này" />
+              ) : (
+                <div className="space-y-6">
+                  {/* Statistics Grid */}
+                  <div
+                    className={`grid grid-cols-2 md:grid-cols-4 ${
+                      isMedicalOrElectricityStaff
+                        ? "lg:grid-cols-3"
+                        : isOfficer
+                          ? "lg:grid-cols-4"
+                          : isResident
+                            ? "lg:grid-cols-6"
+                            : isPatrol
+                              ? "lg:grid-cols-5"
+                              : isManager
+                                ? "lg:grid-cols-5"
+                                : "lg:grid-cols-8"
+                    } gap-4`}
+                  >
+                    <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
+                      <Statistic
+                        title="Tổng phản ánh"
+                        value={totalReflections}
+                        valueStyle={{ color: "#2563eb", fontWeight: "bold" }}
+                      />
+                    </div>
 
-      {/* Map */}
-      <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-md bg-white relative z-0">
-        <MapContainer
-          center={mapCenter}
-          zoom={14}
-          maxZoom={20}
-          className="h-[350px] md:h-[700px] w-full"
-          scrollWheelZoom={true}
-        >
-          <LayersControl position="topright">
-            {/* Base: Carto Light */}
-            <LayersControl.BaseLayer checked name="Bản đồ Sáng (Carto)">
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                maxZoom={20}
-                subdomains="abcd"
-              />
-            </LayersControl.BaseLayer>
-
-            {/* Base: Google Hybrid */}
-            <LayersControl.BaseLayer name="Google Hybrid (Vệ tinh & Đường)">
-              <TileLayer
-                attribution="Google Hybrid"
-                url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
-                maxZoom={20}
-              />
-            </LayersControl.BaseLayer>
-
-            {/* Base: OSM */}
-            <LayersControl.BaseLayer name="OpenStreetMap">
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                maxZoom={20}
-                maxNativeZoom={19}
-              />
-            </LayersControl.BaseLayer>
-
-            {/* Overlay: GeoServer WMS */}
-            <LayersControl.Overlay checked name="🗺️ Bản đồ chi tiết Tâm Bình (WMS)">
-              <WMSTileLayer
-                url={GEOSERVER_URL}
-                layers={GEOSERVER_LAYER}
-                format="image/png"
-                transparent={true}
-                version="1.1.0"
-                attribution="&copy; GeoServer | Tâm Bình"
-                opacity={0.75}
-                maxZoom={20}
-              />
-            </LayersControl.Overlay>
-
-            {/* Overlay: Giao thông Tâm Bình */}
-            <LayersControl.Overlay name="🚦 Giao thông Tâm Bình">
-              <WMSTileLayer
-                url={GEOSERVER_URL}
-                layers="tambinh:giaothongTamBinh1"
-                format="image/png"
-                transparent={true}
-                version="1.1.0"
-                attribution="&copy; GeoServer | Giao thông"
-                opacity={0.8}
-                maxZoom={20}
-              />
-            </LayersControl.Overlay>
-
-            {/* Overlay: Ranh khu phố Tâm Bình */}
-            <LayersControl.Overlay name="🏘️ Ranh khu phố Tâm Bình">
-              <WMSTileLayer
-                url={GEOSERVER_URL}
-                layers="tambinh:ranhkhupho2"
-                format="image/png"
-                transparent={true}
-                version="1.1.0"
-                attribution="&copy; GeoServer | Ranh khu phố"
-                opacity={0.8}
-                maxZoom={20}
-              />
-            </LayersControl.Overlay>
-          </LayersControl>
-
-          {/* WMS Click Handler — lấy thông tin đơn vị hành chính khi click */}
-          {/* <WmsClickHandler
-            wmsUrl={GEOSERVER_URL}
-            displayLayer={GEOSERVER_LAYER}
-            queryLayer={GEOSERVER_QUERY_LAYER}
-          /> */}
-
-          {/* Markers */}
-          {resolvedReflections.map(            (r) =>
-              r.lat &&
-              r.lng && (
-                <CircleMarker
-                  key={r.id}
-                  center={[r.lat, r.lng]}
-                  pathOptions={{
-                    color:
-                      r.status === ReflectionStatus.RESOLVED
-                        ? "#22c55e"
-                        : "#3b82f6",
-                    weight: 3,
-                    fillColor: getPriorityColor(r.priority),
-                    fillOpacity: 0.8,
-                  }}
-                  radius={12}
-                >
-                  <Popup>
-                    <div className="p-1 min-w-[250px]">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`h-8 w-8 ${r.status === ReflectionStatus.RESOLVED ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"} rounded-full flex items-center justify-center`}
-                          >
-                            {r.status === ReflectionStatus.RESOLVED ? (
-                              <Check size={18} />
-                            ) : (
-                              <Clock size={18} />
-                            )}
-                          </div>
-                          <h3 className="font-bold text-base m-0 text-slate-800">
-                            {r.status === ReflectionStatus.RESOLVED
-                              ? "Sự cố đã khắc phục"
-                              : "Sự cố đang xử lý"}
-                          </h3>
+                    {/* Chờ xác minh (Ẩn với PATROL, MANAGER và nhân viên y tế / điện lực) */}
+                    {!isPatrol &&
+                      !isManager &&
+                      !isMedicalOrElectricityStaff && (
+                        <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-100/50">
+                          <Statistic
+                            title="Chờ xác minh"
+                            value={stats.pending || 0}
+                            valueStyle={{
+                              color: "#d97706",
+                              fontWeight: "bold",
+                            }}
+                          />
                         </div>
-                        <Tag
-                          color={
-                            r.status === ReflectionStatus.RESOLVED
-                              ? "green"
-                              : "blue"
-                          }
-                        >
-                          {r.status === ReflectionStatus.RESOLVED
-                            ? "Xong"
-                            : "Đang xử lý"}
-                        </Tag>
+                      )}
+
+                    {/* Đã xác minh (Ẩn với PATROL, MANAGER và nhân viên y tế / điện lực) */}
+                    {!isPatrol &&
+                      !isManager &&
+                      !isMedicalOrElectricityStaff && (
+                        <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100/50">
+                          <Statistic
+                            title="Đã xác minh"
+                            value={stats.verified || 0}
+                            valueStyle={{
+                              color: "#4f46e5",
+                              fontWeight: "bold",
+                            }}
+                          />
+                        </div>
+                      )}
+
+                    {/* Đã phân công (Ẩn với OFFICER, RESIDENT, và nhân viên y tế / điện lực) */}
+                    {!isOfficer &&
+                      !isResident &&
+                      !isMedicalOrElectricityStaff && (
+                        <div className="bg-violet-50/50 p-4 rounded-xl border border-violet-100/50">
+                          <Statistic
+                            title="Đã phân công"
+                            value={stats.assigned || 0}
+                            valueStyle={{
+                              color: "#7c3aed",
+                              fontWeight: "bold",
+                            }}
+                          />
+                        </div>
+                      )}
+
+                    {/* Đang xử lý (Ẩn với OFFICER) */}
+                    {!isOfficer && (
+                      <div className="bg-sky-50/50 p-4 rounded-xl border border-sky-100/50">
+                        <Statistic
+                          title="Đang xử lý"
+                          value={stats.inProgress || 0}
+                          valueStyle={{ color: "#0284c7", fontWeight: "bold" }}
+                        />
                       </div>
-                      <div className="space-y-2">
-                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 text-sm">
-                          <p className="font-bold text-slate-700 mb-1">
-                            {r.title}
-                          </p>
-                          <p className="text-slate-600 italic">"{r.content}"</p>
+                    )}
+
+                    {/* Chờ xác nhận (Ẩn với OFFICER, RESIDENT, MANAGER, và nhân viên y tế / điện lực) */}
+                    {!isOfficer &&
+                      !isResident &&
+                      !isManager &&
+                      !isMedicalOrElectricityStaff && (
+                        <div className="bg-cyan-50/50 p-4 rounded-xl border border-cyan-100/50">
+                          <Statistic
+                            title="Chờ xác nhận"
+                            value={stats.completed || 0}
+                            valueStyle={{
+                              color: "#0891b2",
+                              fontWeight: "bold",
+                            }}
+                          />
                         </div>
-                        {r.status === ReflectionStatus.RESOLVED && (
-                          <div className="bg-green-50 p-2 rounded-lg border border-green-100 text-sm">
-                            <p className="font-medium text-green-700 mb-1">
-                              Kết quả xử lý:
-                            </p>
-                            <p className="text-green-800">
-                              {r.response ||
-                                "Đã hoàn thành công tác xử lý tại thực địa."}
-                            </p>
+                      )}
+
+                    {/* Đã hoàn thành (Ẩn với OFFICER) */}
+                    {!isOfficer && (
+                      <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100/50">
+                        <Statistic
+                          title="Đã hoàn thành"
+                          value={stats.resolved || 0}
+                          valueStyle={{ color: "#059669", fontWeight: "bold" }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Từ chối (Ẩn với PATROL và nhân viên y tế / điện lực) */}
+                    {!isPatrol && !isMedicalOrElectricityStaff && (
+                      <div className="bg-red-50/50 p-4 rounded-xl border border-red-100/50">
+                        <Statistic
+                          title="Từ chối"
+                          value={stats.rejected || 0}
+                          valueStyle={{ color: "#ef4444", fontWeight: "bold" }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Column Bar Chart */}
+                  <div className="w-full h-[320px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={statsData}
+                        margin={{ top: 20, right: 10, left: 0, bottom: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: "#64748b", fontSize: 11 }}
+                        />
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: "#64748b", fontSize: 11 }}
+                        />
+                        <RechartsTooltip
+                          cursor={{ fill: "rgba(0, 0, 0, 0.02)" }}
+                          contentStyle={{
+                            borderRadius: "12px",
+                            border: "1px solid #f1f5f9",
+                            boxShadow: "0 10px 15px -3px rgba(0,0,0,0.05)",
+                          }}
+                        />
+                        <Bar
+                          dataKey="count"
+                          name="Số lượng"
+                          radius={[6, 6, 0, 0]}
+                          barSize={32}
+                        >
+                          {statsData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* DỮ LIỆU MƯA REAL-TIME (Chiếm 1/3 hoặc toàn bộ chiều rộng) */}
+        <div>
+          <Card
+            title={
+              <div className="flex items-center justify-between w-full">
+                <span className="font-bold text-slate-800">
+                  Mưa và Thời tiết thực tế
+                </span>
+                <Button
+                  type="text"
+                  shape="circle"
+                  onClick={fetchWeather}
+                  disabled={loadingWeather}
+                  icon={
+                    <RefreshCw
+                      size={14}
+                      className={loadingWeather ? "animate-spin" : ""}
+                    />
+                  }
+                />
+              </div>
+            }
+            className="shadow-sm rounded-2xl border border-slate-100 bg-white h-full"
+          >
+            {loadingWeather ? (
+              <div className="flex flex-col items-center justify-center py-24 gap-3">
+                <Spin size="large" />
+                <Text className="text-slate-400 text-xs">
+                  Đang lấy dữ liệu thời tiết...
+                </Text>
+              </div>
+            ) : weatherError ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+                <AlertTriangle size={36} className="text-amber-500" />
+                <Text className="text-slate-600 font-medium">
+                  Không thể kết nối API thời tiết
+                </Text>
+                <Button type="primary" onClick={fetchWeather}>
+                  Thử lại
+                </Button>
+              </div>
+            ) : weather ? (
+              <div className="space-y-6">
+                {/* Weather primary display */}
+                <div className="flex items-center justify-between bg-linear-to-r from-blue-500/5 to-indigo-500/5 p-4 rounded-2xl border border-slate-50">
+                  <div>
+                    <h3 className="text-4xl font-extrabold text-slate-800 m-0">
+                      {weather.temp}°C
+                    </h3>
+                    <p className="text-sm font-semibold text-slate-600 capitalize mt-1 mb-0">
+                      {weather.description}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1 mb-0">
+                      Cảm giác như {weather.feelsLike}°C
+                    </p>
+                  </div>
+                  <div>{weatherIcon}</div>
+                </div>
+
+                {/* Rain highlight state */}
+                {(() => {
+                  const rain = weather.rainLastHour || weather.rain3h / 3 || 0;
+                  const intensity = getRainIntensityLabel(rain);
+                  return (
+                    <div
+                      className={`p-4 rounded-xl border flex flex-col gap-3 ${intensity.bg}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <CloudRain className={intensity.color} size={24} />
+                        <div>
+                          <div
+                            className={`font-bold text-sm ${intensity.color}`}
+                          >
+                            Tình trạng: {intensity.label}
                           </div>
-                        )}
-                        <div className="flex flex-col gap-1 pt-1 text-xs text-slate-400">
-                          <span>📍 {r.address || `${r.lat}, ${r.lng}`}</span>
-                          <span>
-                            ⏰ {new Date(r.createdAt).toLocaleString("vi-VN")}
+                          <div className="text-xs text-slate-500 mt-0.5">
+                            Trạm cảnh báo mưa Phường Tam Bình, Thủ Đức
+                          </div>
+                        </div>
+                      </div>
+                      {weather.rainProbability !== undefined && (
+                        <div className="flex items-center justify-between text-xs border-t border-dashed border-slate-200/60 pt-2 mt-1">
+                          <span className="text-slate-500 font-medium">
+                            Khả năng có mưa (3h tới):
+                          </span>
+                          <span className="font-bold text-slate-700 bg-white/60 px-2.5 py-0.5 rounded-full border border-slate-100">
+                            {weather.rainProbability}%
                           </span>
                         </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Rain volume stats */}
+                <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-3">
+                  <div className="text-[11px] font-bold text-slate-400 tracking-wider uppercase">
+                    Lượng mưa ghi nhận
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-blue-50/50 border border-blue-100/50 p-3 rounded-lg">
+                      <div className="text-xl font-bold text-blue-600">
+                        {weather.rainLastHour.toFixed(1)} mm
+                      </div>
+                      <div className="text-[10px] text-blue-400 font-semibold mt-1">
+                        1 giờ qua
                       </div>
                     </div>
-                  </Popup>
-                </CircleMarker>
-              ),
-          )}
-        </MapContainer>
+                    <div className="bg-indigo-50/50 border border-indigo-100/50 p-3 rounded-lg">
+                      <div className="text-xl font-bold text-indigo-600">
+                        {weather.rain3h.toFixed(1)} mm
+                      </div>
+                      <div className="text-[10px] text-indigo-400 font-semibold mt-1">
+                        3 giờ qua
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Auxiliary conditions */}
+                <div className="grid grid-cols-3 gap-2 pt-2">
+                  <div className="flex flex-col items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <Droplets size={16} className="text-blue-500 mb-1" />
+                    <div className="text-xs font-bold text-slate-800">
+                      {weather.humidity}%
+                    </div>
+                    <div className="text-[9px] text-slate-400 mt-0.5">
+                      Độ ẩm
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <Wind size={16} className="text-cyan-500 mb-1" />
+                    <div className="text-xs font-bold text-slate-800">
+                      {weather.windSpeed} km/h
+                    </div>
+                    <div className="text-[9px] text-slate-400 mt-0.5">
+                      Tốc độ gió
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <Eye size={16} className="text-emerald-500 mb-1" />
+                    <div className="text-xs font-bold text-slate-800">
+                      {weather.visibility} km
+                    </div>
+                    <div className="text-[9px] text-slate-400 mt-0.5">
+                      Tầm nhìn
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-center text-[10px] text-slate-400 pt-2 border-t border-slate-100">
+                  {lastUpdated &&
+                    `Cập nhật lúc: ${lastUpdated.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Ho_Chi_Minh" })}`}
+                </div>
+              </div>
+            ) : null}
+          </Card>
+        </div>
       </div>
-
-      {/* Quick actions */}
-      <div className="grid grid-cols-2 gap-3">
-        <div
-          onClick={() =>
-            handleOpenModal("rain", "Thông tin Mưa", "Chi tiết về lượng mưa...")
-          }
-          className="h-20 cursor-pointer rounded-xl bg-blue-500 hover:bg-blue-600 shadow-sm flex flex-col items-center justify-center gap-1 text-white transition-all transform hover:scale-[1.02] active:scale-95"
-        >
-          <CloudRain size={24} />
-          <span className="text-sm font-semibold">Mưa</span>
-        </div>
-        <div
-          onClick={() =>
-            handleOpenModal("tide", "Triều Cường", "Lịch triều cường...")
-          }
-          className="h-20 cursor-pointer rounded-xl bg-cyan-600 hover:bg-cyan-700 shadow-sm flex flex-col items-center justify-center gap-1 text-white transition-all transform hover:scale-[1.02] active:scale-95"
-        >
-          <Waves size={24} />
-          <span className="text-sm font-semibold">Triều Cường</span>
-        </div>
-        <div
-          onClick={() =>
-            handleOpenModal(
-              "traffic",
-              "Giao Thông & Tuyến Đường",
-              "Các tuyến đường bị ngập...",
-            )
-          }
-          className="h-20 cursor-pointer rounded-xl bg-amber-500 hover:bg-amber-600 shadow-sm flex flex-col items-center justify-center gap-1 text-white transition-all transform hover:scale-[1.02] active:scale-95"
-        >
-          <Car size={24} />
-          <span className="text-sm font-semibold">Giao Thông</span>
-        </div>
-        <div
-          onClick={() =>
-            handleOpenModal("other", "Thông Tin Khác", "Các thông báo khác...")
-          }
-          className="h-20 cursor-pointer rounded-xl bg-white border border-slate-200 hover:bg-slate-50 shadow-sm flex flex-col items-center justify-center gap-1 text-slate-700 transition-all transform hover:scale-[1.02] active:scale-95"
-        >
-          <Info size={24} />
-          <span className="text-sm font-semibold">Thông Tin Khác</span>
-        </div>
-      </div>
-
-      <NewsFeed />
-
-      <Modal
-        title={currentInfo?.title}
-        open={isModalOpen}
-        onOk={handleCloseModal}
-        onCancel={handleCloseModal}
-        width={800}
-        footer={null}
-      >
-        {renderModalContent()}
-      </Modal>
     </div>
   );
 }

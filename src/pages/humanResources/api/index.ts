@@ -1,49 +1,24 @@
 import axios from "axios";
 import { BASE_URL } from "@/apis"
 import type { ApiResponse, PaginatedResponse } from "@/components/interfaces/response.interface"
-import type { CreateHumanResources, HumanResources, UpdateHumanResources } from "../interfaces"
+import type { CreateHumanResources, HumanResources } from "../interfaces"
 
 // Tạo biến môi trường 
 const HUMANRESOURCE_URL = '/human-resources'
 
-// Instance riêng để gọi đến hệ thống xác thực nhân sự
-const HR_VERIFY_URL = axios.create({
-  baseURL: window.location.hostname === 'ql-vunglu.site'
-    ? 'https://ql-vunglu.site/api-nhansu/v1'
-    : 'http://localhost:3003/api-nhansu/v1',
-  timeout: 10000,
-});
-
-export interface VerificationHistoryItem {
-  id: number;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  reason: string;
-  createDate: string;
-  updateDate: string;
-  humanResource: {
-    employeeCode: string;
-    fullName: string;
-    position: string;
-  };
-}
-
-// API lấy lịch sử xác thực nhân sự theo employeeCode
-export const getHRVerificationHistory = async (employeeCode: string): Promise<{ data: VerificationHistoryItem[], total: number }> => {
-  const response = await HR_VERIFY_URL.get('/verifications', {
-    params: { employeeCode }
-  });
-  return response.data;
-};
-
 // API thêm nhân sự 
-export const createHumanResource = async (value: CreateHumanResources) => {
+export const createHumanResource = async (value: CreateHumanResources | FormData) => {
+  const isFormData = value instanceof FormData;
   const response = await BASE_URL.post<ApiResponse<HumanResources>>(`${HUMANRESOURCE_URL}`, value, {
-    headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
+    headers: { 
+      Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+      ...(isFormData ? { "Content-Type": "multipart/form-data" } : {}),
+    },
   })
   return response.data
 }
 
-export const updateHumanResource = async (value: UpdateHumanResources, id: number) => {
+export const updateHumanResource = async (value: CreateHumanResources, id: number) => {
   const response = await BASE_URL.patch<ApiResponse<HumanResources>>(`${HUMANRESOURCE_URL}/${id}`, value, {
     headers: { Authorization: `Bearer ${localStorage.getItem("accessToken")}` },
   })

@@ -1,13 +1,9 @@
 import { Role } from "@/enums";
-import { BASE_URL } from "@/apis";
-import { getProfileApi } from "@/pages/profile/api";
-import { useQuery } from "@tanstack/react-query";
 import {
   Button,
   List,
   Modal,
   Popconfirm,
-  Select,
   Spin,
   Tag,
   Tooltip,
@@ -27,198 +23,48 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { io, type Socket } from "socket.io-client";
-import { assignReflectionApi } from "../../reflection/api";
-import {
-  deleteVerificationApi,
-  getVerificationsApi,
-  updateVerificationApi,
-} from "../api";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { updateVerificationApi } from "../api";
 import {
   VerificationStatus,
   VerificationType,
-  type NotificationSocket,
   type Verification,
 } from "../interfaces";
+import { useVerificationData } from "../hooks/useVerificationData";
 
 export default function ListVerification() {
-  const [selectedVerification, setSelectedVerification] =
-    useState<Verification | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const [limit] = useState(10);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // State cho modal phân công Hậu kiểm
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [inspectorList, setInspectorList] = useState<
-    { id: number; fullName: string }[]
-  >([]);
-  const [selectedInspectorId, setSelectedInspectorId] = useState<number | null>(
-    null,
-  );
-  const [assignNote, setAssignNote] = useState("");
-
+  const navigate = useNavigate();
   const {
-    data: verifications,
+    selectedVerification,
+    setSelectedVerification,
+    isDetailModalOpen,
+    setIsDetailModalOpen,
+    page,
+    setPage,
+    limit,
+    isUpdating,
+    setIsUpdating,
+    isDeleteModalOpen,
+    setIsDeleteModalOpen,
+    isDeleting,
+    verifications,
     isLoading,
     refetch,
-  } = useQuery({
-    queryKey: ["verifications", page, limit],
-    queryFn: () => getVerificationsApi({ page, limit }),
-    refetchOnWindowFocus: true,
-    refetchInterval: 30000, // Poll mỗi 30s nếu tab active
-  });
+    profileData,
+    handleVerify,
+    handleDelete,
+  } = useVerificationData();
 
-  // Kết nối socket để refetch real-time khi có thông báo verification
   useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-
-    const socketUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
-    const socket: Socket = io(`${socketUrl}/notifications`, {
-      auth: { token },
-      transports: ["websocket"],
-    });
-
-    socket.on("connect", () => {
-      console.log("[Verification] Connected to notification socket");
-    });
-
-    // Refetch khi có bất kỳ thông báo nào liên quan đến verification hoặc reflection
-    socket.on("newNotification", (notification: NotificationSocket) => {
-      const relatedTypes = [
-        "REFLECTION_UPDATE",
-        "NEW_REFLECTION",
-        "REFLECTION_RESOLVED",
-        "VERIFICATION_UPDATE",
-      ];
-      if (
-        relatedTypes.includes(notification?.type || "") ||
-        notification?.referenceId ||
-        notification?.title?.toLowerCase().includes("phản ánh") ||
-        notification?.title?.toLowerCase().includes("xác minh")
-      ) {
-        refetch();
-      }
-    });
-
-    socket.on("connect_error", (error: Error) => {
-      console.error("[Verification] Socket error:", error);
-    });
-    return () => {
-      socket.disconnect();
-    };
-  }, [refetch]);
-
-  const { data: profileData } = useQuery({
-    queryKey: ["profile"],
-    queryFn: async () => {
-      const response = await getProfileApi();
-      return response?.data;
-    },
-  });
-
-  const handleVerify = async (id: number, status: VerificationStatus) => {
-    try {
-      setIsUpdating(true);
-      await updateVerificationApi(id, { status });
-      notification.success({
-        title: "Thành công",
-        description:
-          status === VerificationStatus.APPROVED
-            ? "Đã duyệt yêu cầu!"
-            : "Đã từ chối yêu cầu!",
-      });
-      refetch();
-      if (selectedVerification?.id === id) {
-        setIsDetailModalOpen(false);
-      }
-    } catch {
-      notification.error({
-        title: "Thất bại",
-        description: "Thao tác thất bại",
-      });
-    } finally {
-      setIsUpdating(false);
+    if (
+      profileData &&
+      (profileData.role.roleCode === Role.ADMIN ||
+        profileData.role.roleCode === Role.MANAGER)
+    ) {
+      navigate("/app/dashboard");
     }
-  };
-
-  /** Lấy danh sách Hậu kiểm (INSPECTOR) để chọn phân công */
-  const loadInspectors = async () => {
-    try {
-      const response = await BASE_URL.get("/human-resources", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-        params: { roleCode: "INSPECTOR", limit: 100 },
-      });
-      const list = response.data?.data || [];
-      setInspectorList(list);
-    } catch {
-      notification.error({
-        title: "Lỗi",
-        description: "Không thể tải danh sách Hậu kiểm",
-      });
-    }
-  };
-
-  /** MANAGER phân công phản ánh đúng workflow: gọi /assign thay vì đổi status trực tiếp */
-  const handleAssignInspector = async () => {
-    if (!selectedVerification?.referenceId || !selectedInspectorId) return;
-    try {
-      setIsUpdating(true);
-      // Bước 1: Phân công phản ánh cho Inspector (đúng workflow)
-      await assignReflectionApi(selectedVerification.referenceId, {
-        inspectorId: selectedInspectorId,
-        note: assignNote || undefined,
-      });
-      // Bước 2: Đánh dấu Verification là COMPLETED
-      await updateVerificationApi(selectedVerification.id, {
-        status: VerificationStatus.COMPLETED,
-      });
-      notification.success({
-        title: "Thành công",
-        description: "Đã phân công Hậu kiểm xử lý phản ánh!",
-      });
-      setIsAssignModalOpen(false);
-      setIsDetailModalOpen(false);
-      setSelectedInspectorId(null);
-      setAssignNote("");
-      refetch();
-    } catch {
-      notification.error({
-        title: "Thất bại",
-        description: "Không thể phân công. Vui lòng thử lại.",
-      });
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!selectedVerification) return;
-    try {
-      setIsDeleting(true);
-      await deleteVerificationApi(selectedVerification.id);
-      notification.success({
-        title: "Thành công",
-        description: "Đã xóa yêu cầu xác thực!",
-      });
-      setIsDeleteModalOpen(false);
-      refetch();
-    } catch {
-      notification.error({
-        title: "Thất bại",
-        description: "Xóa thất bại",
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+  }, [profileData, navigate]);
 
   const getStatusTag = (status: VerificationStatus) => {
     switch (status) {
@@ -481,7 +327,7 @@ export default function ListVerification() {
                       backgroundColor: "#7c3aed",
                       borderColor: "#7c3aed",
                     }}
-                    onClick={() => {
+                    onClick={async () => {
                       if (!selectedVerification.referenceId) {
                         notification.warning({
                           title: "Không có phản ánh liên kết",
@@ -490,12 +336,25 @@ export default function ListVerification() {
                         });
                         return;
                       }
-                      loadInspectors();
-                      setIsAssignModalOpen(true);
+                      try {
+                        setIsUpdating(true);
+                        await updateVerificationApi(selectedVerification.id, {
+                          status: VerificationStatus.COMPLETED,
+                        });
+                        setIsDetailModalOpen(false);
+                        navigate("/app/dispatch-manager/list");
+                      } catch {
+                        notification.error({
+                          title: "Lỗi",
+                          description: "Không thể cập nhật trạng thái yêu cầu xác thực.",
+                        });
+                      } finally {
+                        setIsUpdating(false);
+                      }
                     }}
                     loading={isUpdating}
                   >
-                    Phân công Hậu kiểm
+                    Phân công cho Tuần tra
                   </Button>
                 </>
               )}
@@ -607,7 +466,6 @@ export default function ListVerification() {
         )}
       </Modal>
 
-      {/* Modal xác nhận xóa */}
       <Modal
         title="Xác nhận xóa"
         open={isDeleteModalOpen}
@@ -646,99 +504,6 @@ export default function ListVerification() {
             </p>
           </div>
         )}
-      </Modal>
-
-      {/* Modal Phân công Hậu kiểm */}
-      <Modal
-        title={
-          <div className="flex items-center gap-2">
-            <UserCheck size={18} className="text-purple-600" />
-            <span>Phân công Hậu kiểm xử lý phản ánh</span>
-          </div>
-        }
-        open={isAssignModalOpen}
-        onCancel={() => {
-          setIsAssignModalOpen(false);
-          setSelectedInspectorId(null);
-          setAssignNote("");
-        }}
-        footer={[
-          <Button
-            key="cancel"
-            onClick={() => {
-              setIsAssignModalOpen(false);
-              setSelectedInspectorId(null);
-              setAssignNote("");
-            }}
-          >
-            Hủy
-          </Button>,
-          <Button
-            key="assign"
-            type="primary"
-            loading={isUpdating}
-            disabled={!selectedInspectorId}
-            onClick={handleAssignInspector}
-            style={{ backgroundColor: "#7c3aed", borderColor: "#7c3aed" }}
-            icon={<UserCheck size={14} />}
-          >
-            Xác nhận phân công
-          </Button>,
-        ]}
-      >
-        <div className="space-y-4 py-2">
-          {selectedVerification?.referenceId && (
-            <div className="bg-purple-50 border border-purple-100 rounded-xl px-4 py-3">
-              <p className="text-xs font-bold text-purple-600 mb-0.5">
-                Phản ánh liên kết
-              </p>
-              <p className="text-sm font-semibold text-purple-900">
-                #{selectedVerification.referenceId} —{" "}
-                {selectedVerification.title}
-              </p>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-2">
-              Chọn cán bộ Hậu kiểm <span className="text-red-500">*</span>
-            </label>
-            <Select
-              placeholder="Chọn Hậu kiểm..."
-              className="w-full"
-              value={selectedInspectorId}
-              onChange={(val) => setSelectedInspectorId(val)}
-              options={inspectorList.map((u) => ({
-                value: u.id,
-                label: u.fullName,
-              }))}
-              showSearch
-              filterOption={(input, option) =>
-                String(option?.label ?? "")
-                  .toLowerCase()
-                  .includes(input.toLowerCase())
-              }
-              notFoundContent={
-                <div className="text-center text-slate-400 py-3 text-sm">
-                  Không tìm thấy Hậu kiểm nào
-                </div>
-              }
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-600 mb-2">
-              Ghi chú (Tùy chọn)
-            </label>
-            <textarea
-              placeholder="Nhập ghi chú cho Hậu kiểm..."
-              value={assignNote}
-              onChange={(e) => setAssignNote(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 bg-slate-50 resize-none focus:outline-none focus:ring-2 focus:ring-purple-400"
-              rows={3}
-            />
-          </div>
-        </div>
       </Modal>
     </div>
   );

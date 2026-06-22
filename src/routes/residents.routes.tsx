@@ -10,8 +10,9 @@ const ListResidentsPage = React.lazy(
 const DetailResidentsPage = React.lazy(
   () => import("@/pages/residents/pages/DetailResidents"),
 );
-const FormanagerResidents = React.lazy(
-  () => import("@/pages/residents/components/FormanagerResidents"),
+
+const ImportResidentsPage = React.lazy(
+  () => import("@/pages/residents/pages/ImportResidents"),
 );
 export const residentsRoutes: RouteObject[] = [
   {
@@ -34,27 +35,20 @@ export const residentsRoutes: RouteObject[] = [
           </LazyLoad>
         ),
       },
-      {
-        path: "create",
-        element: (
-          <LazyLoad>
-            <FormanagerResidents mode="add" />
-          </LazyLoad>
-        ),
-      },
-      {
-        path: "edit/:id",
-        element: (
-          <LazyLoad>
-            <FormanagerResidents mode="edit" />
-          </LazyLoad>
-        ),
-      },
+
       {
         path: "detail/:id",
         element: (
           <LazyLoad>
             <DetailResidentsPage />
+          </LazyLoad>
+        ),
+      },
+      {
+        path: "import-excel",
+        element: (
+          <LazyLoad>
+            <ImportResidentsPage />
           </LazyLoad>
         ),
       },

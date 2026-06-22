@@ -1,27 +1,39 @@
 self.addEventListener('push', function (event) {
   console.log('[Service Worker] Push Received.');
   if (event.data) {
+    let payload;
     try {
-      const data = event.data.json();
-      const title = data.title || 'Thông báo mới';
-      const options = {
-        body: data.body || '',
-        icon: '/image-logo.png',
-        badge: '/image-logo.png',
-        data: data.data || {},
-        vibrate: [100, 50, 100],
-      };
-      event.waitUntil(self.registration.showNotification(title, options));
+      payload = event.data.json();
     } catch (e) {
-      const text = event.data.text();
-      event.waitUntil(
-        self.registration.showNotification('Thông báo mới', {
-          body: text,
-          icon: '/image-logo.png',
-          badge: '/image-logo.png',
-        })
-      );
+      payload = { title: 'Thông báo mới', body: event.data.text() };
     }
+
+    const title = payload.title || 'Thông báo mới';
+    const options = {
+      body: payload.body || '',
+      icon: '/image-logo.png',
+      badge: '/image-logo.png',
+      data: payload.data || {},
+      vibrate: [100, 50, 100],
+    };
+
+    event.waitUntil(
+      clients.matchAll({
+        type: 'window',
+        includeUncontrolled: true
+      }).then(function (clientList) {
+        const isAppFocused = clientList.some(function (client) {
+          return client.focused;
+        });
+
+        if (isAppFocused) {
+          console.log('[Service Worker] App is focused. Skipping browser push notification.');
+          return;
+        }
+
+        return self.registration.showNotification(title, options);
+      })
+    );
   }
 });
 

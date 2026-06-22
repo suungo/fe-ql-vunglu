@@ -1,8 +1,9 @@
 export interface AccountRequest {
   phoneNumber: string;
   fullName: string;
-  email: string;
-  password: string;
+  email?: string;
+  password?: string;
+  roleCode?: string;
 }
 
 export interface Role {
@@ -21,6 +22,10 @@ export interface User {
   avatar?: string;
   createdAt: string;
   role: Role;
+  resident?: {
+    id: number;
+    residentCode?: string;
+  };
 }
 
 export interface ApiResponse<T> {

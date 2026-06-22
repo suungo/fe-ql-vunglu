@@ -22,12 +22,12 @@ export default defineConfig({
       usePolling: true, // Bật chế độ quét vòng (polling) để khắc phục lỗi hệ điều hành Windows không báo sự kiện thay đổi file cho Vite
     },
     // hmr: { host: '192.168.100.27' }, // bỏ comment nếu dùng mạng LAN
-    proxy: {
-      '/geoserver': {
-        target: 'https://ql-vunglu.site/geoserver',
-        changeOrigin: true,
-        secure: false,
-      },
-    },
+    // proxy: {
+    //   '/geoserver': {
+    //     target: 'https://ql-vunglu.site/geoserver',
+    //     changeOrigin: true,
+    //     secure: false,
+    //   },
+    // },
   },
 })

@@ -4,7 +4,7 @@ import type { UpdateVerification, Verification } from "../interfaces";
 
 const PATH = "verifications";
 
-export const getVerificationsApi = async (params: { page?: number; limit?: number; status?: string }) => {
+export const getVerificationsApi = async (params: { page?: number; limit?: number; status?: string; verificationType?: string }) => {
   const response = await BASE_URL.get<PaginatedResponse<Verification>>(`/${PATH}`, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
