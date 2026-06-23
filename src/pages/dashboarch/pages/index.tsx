@@ -41,7 +41,21 @@ const { RangePicker } = DatePicker;
 // Tọa độ phường Tam Bình, TP Thủ Đức
 const LAT = 10.865;
 const LON = 106.731;
-const OWM_API_KEY = "bd5e378503939ddaee76f12ad7a97608";
+
+// Chuyển WMO weather code sang mô tả tiếng Việt và condition string
+const wmoToCondition = (code: number): { description: string; condition: string } => {
+  if (code === 0) return { description: "trời quang", condition: "Clear" };
+  if (code <= 2) return { description: "ít mây", condition: "Clouds" };
+  if (code === 3) return { description: "nhiều mây", condition: "Clouds" };
+  if (code <= 49) return { description: "sương mù", condition: "Fog" };
+  if (code <= 59) return { description: "mưa phùn", condition: "Drizzle" };
+  if (code <= 69) return { description: "mưa", condition: "Rain" };
+  if (code <= 79) return { description: "tuyết", condition: "Snow" };
+  if (code <= 82) return { description: "mưa rào", condition: "Rain" };
+  if (code <= 84) return { description: "mưa rào to", condition: "Rain" };
+  if (code <= 99) return { description: "dông", condition: "Thunderstorm" };
+  return { description: "không rõ", condition: "Clear" };
+};
 
 interface WeatherData {
   temp: number;
@@ -95,42 +109,47 @@ export default function Dashboard() {
       .finally(() => setIsStatsLoading(false));
   }, []);
 
-  // 2. Fetch dữ liệu thời tiết thời gian thực
+  // 2. Fetch dữ liệu thời tiết thực tế từ Open-Meteo (miễn phí, không cần API key, không giới hạn)
   const fetchWeather = useCallback(async () => {
     setLoadingWeather(true);
     setWeatherError(false);
     try {
-      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${LAT}&lon=${LON}&appid=${OWM_API_KEY}&units=metric&lang=vi`;
+      // Open-Meteo: current weather + hourly forecast trong 1 request
+      const url =
+        `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}` +
+        `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,visibility,precipitation` +
+        `&hourly=precipitation_probability,precipitation` +
+        `&forecast_days=1&timezone=Asia%2FHo_Chi_Minh`;
+
       const res = await fetch(url);
-      if (!res.ok) throw new Error("Weather fetch failed");
+      if (!res.ok) throw new Error("Open-Meteo fetch failed");
       const data = await res.json();
 
-      // Fetch forecast for probability of precipitation (pop)
-      let rainProbability = 0;
-      try {
-        const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${LAT}&lon=${LON}&appid=${OWM_API_KEY}&units=metric&lang=vi`;
-        const forecastRes = await fetch(forecastUrl);
-        if (forecastRes.ok) {
-          const forecastData = await forecastRes.json();
-          // pop represents probability of precipitation from 0.0 to 1.0 (e.g. 0.85 -> 85%)
-          rainProbability = Math.round(
-            (forecastData.list?.[0]?.pop ?? 0) * 100,
-          );
-        }
-      } catch (err) {
-        console.error("Forecast fetch error:", err);
-      }
+      const current = data.current ?? {};
+      const hourly = data.hourly ?? {};
+
+      // Lấy index giờ hiện tại trong mảng hourly
+      const nowHour = new Date().getHours();
+      const rainProbability: number = hourly.precipitation_probability?.[nowHour] ?? 0;
+
+      // Lượng mưa giờ hiện tại và 3 giờ qua
+      const rainLastHour: number = hourly.precipitation?.[nowHour] ?? 0;
+      const rain3h: number = [nowHour - 2, nowHour - 1, nowHour]
+        .filter((h) => h >= 0)
+        .reduce((sum, h) => sum + (hourly.precipitation?.[h] ?? 0), 0);
+
+      const { description, condition } = wmoToCondition(current.weather_code ?? 0);
 
       setWeather({
-        temp: Math.round(data.main?.temp ?? 30),
-        feelsLike: Math.round(data.main?.feels_like ?? 32),
-        humidity: data.main?.humidity ?? 80,
-        windSpeed: Math.round((data.wind?.speed ?? 2) * 3.6), // m/s -> km/h
-        visibility: Math.round((data.visibility ?? 10000) / 1000), // m -> km
-        description: data.weather?.[0]?.description ?? "không rõ",
-        rainLastHour: data.rain?.["1h"] ?? 0,
-        rain3h: data.rain?.["3h"] ?? 0,
-        condition: data.weather?.[0]?.main ?? "Clear",
+        temp: Math.round(current.temperature_2m ?? 30),
+        feelsLike: Math.round(current.apparent_temperature ?? 32),
+        humidity: current.relative_humidity_2m ?? 80,
+        windSpeed: Math.round(current.wind_speed_10m ?? 10), // đã là km/h
+        visibility: Math.round((current.visibility ?? 10000) / 1000), // m -> km
+        description,
+        rainLastHour,
+        rain3h,
+        condition,
         rainProbability,
       });
       setLastUpdated(new Date());

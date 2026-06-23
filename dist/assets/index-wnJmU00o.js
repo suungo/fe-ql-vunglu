@@ -1,0 +1,1 @@
+import{f as t}from"./index-BlTKhutl.js";const s="/resident-contacts",a=()=>({Authorization:`Bearer ${localStorage.getItem("accessToken")}`}),r=async e=>(await t.post(`${s}/bulk`,{contacts:e},{headers:a()})).data,c=async e=>(await t.get(s,{params:e,headers:a()})).data,d=async e=>(await t.delete(`${s}/${e}`,{headers:a()})).data;export{r as b,d,c as g};

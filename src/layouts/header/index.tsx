@@ -770,7 +770,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
           </div>
         )}
       </Modal>
-      <header className="sticky top-0 z-1999 flex h-16 items-center justify-between bg-[linear-gradient(90deg,#1a5d9f_0%,#1b75c8_100%)] px-3 md:px-6 text-white shadow-lg">
+      <header className="sticky top-0 z-950 flex h-16 items-center justify-between bg-[linear-gradient(90deg,#1a5d9f_0%,#1b75c8_100%)] px-3 md:px-6 text-white shadow-lg">
         <div className="flex items-center gap-2 md:gap-4 xl:gap-6">
           {/* Hamburger button cho mobile */}
           {onMenuToggle && (

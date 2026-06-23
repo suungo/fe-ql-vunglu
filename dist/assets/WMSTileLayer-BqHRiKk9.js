@@ -1,0 +1,1 @@
+import{g as i,h as m,l as c,w as u,a as y}from"./TileLayer-2g1QCcXZ.js";const f=i(function({eventHandlers:r,params:e={},url:a,...l},t){const s=new c.TileLayer.WMS(a,{...e,...u(l,t)});return y(s,t)},function(r,e,a){m(r,e,a),e.params!=null&&e.params!==a.params&&r.setParams(e.params)});export{f as W};

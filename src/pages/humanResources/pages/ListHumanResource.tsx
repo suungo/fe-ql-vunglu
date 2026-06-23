@@ -428,7 +428,7 @@ export default function HumanResourcesPage() {
         centered
         maskClosable={false}
         closeIcon={false}
-        className="xl:min-w-[1108px] lg:min-w-[960px] z-100 my-10"
+        className="xl:min-w-[1108px] lg:min-w-[960px] z-2001 my-10"
         title={
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold text-[16px] sm:text-[18px] md:text-[20px] lg:text-[22px] xl:text-[24px]">
